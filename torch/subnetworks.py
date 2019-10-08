@@ -6,17 +6,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from recursive_planning.blox import AttrDict
-from recursive_planning.blox.tensor.ops import broadcast_final, batch_apply, map_recursive, batchwise_index, \
+from blox.torch.ops import apply_linear
+from blox.torch.ops import like, make_one_hot, mask_out
+from blox import AttrDict
+from blox.tensor.ops import broadcast_final, batch_apply, map_recursive, batchwise_index, \
     batchwise_assign, remove_spatial, concat_inputs
-from recursive_planning.blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ
-from recursive_planning.blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
+from blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ
+from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from recursive_planning.blox.torch.losses import CELoss, KLDivLoss
-from recursive_planning.blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential
-from recursive_planning.blox.torch.ops import apply_linear
-from recursive_planning.blox.torch.ops import like, make_one_hot, mask_out
-from recursive_planning.blox.torch.recurrent_modules import BaseProcessingLSTM, \
+from blox.torch.losses import CELoss, KLDivLoss
+from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential
+from blox.torch.recurrent_modules import BaseProcessingLSTM, \
     BidirectionalLSTM, BareLSTMCell
 from torch import Tensor
 from torch.distributions.one_hot_categorical import OneHotCategorical

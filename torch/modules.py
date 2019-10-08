@@ -1,11 +1,9 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from recursive_planning.blox import AttrDict
-from recursive_planning.blox.basic_types import map_dict
-from recursive_planning.blox.tensor.ops import concat_inputs
-import torch
-import torch.nn as nn
+from blox.tensor.ops import concat_inputs
+from blox import AttrDict
+from blox.basic_types import map_dict
 
 
 class DummyModule(nn.Module):

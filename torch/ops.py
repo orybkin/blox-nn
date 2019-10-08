@@ -1,9 +1,7 @@
 from functools import partial
 
-from recursive_planning.blox.tensor.ops import batchwise_assign
-import torch
 import torch.nn as nn
-from recursive_planning.blox.tensor.ops import *
+from blox.tensor.ops import *
 
 
 def apply_linear(layer, val, dim):

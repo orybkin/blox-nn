@@ -1,7 +1,7 @@
 import torch
-from recursive_planning.blox.tensor.ops import get_dim_inds
-from recursive_planning.blox import AttrDict
-from recursive_planning.blox.torch.dist import Gaussian
+from blox import AttrDict
+from blox.torch.dist import Gaussian
+from blox.tensor.ops import get_dim_inds
 
 
 class Loss():

@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
+from blox.tensor.ops import concat_inputs
 from funcsigs import signature
-from recursive_planning.blox import AttrDict
-from recursive_planning.blox.basic_types import map_dict, listdict2dictlist, subdict
-from recursive_planning.blox.tensor.ops import concat_inputs
-from recursive_planning.blox.torch.dist import stack
-from recursive_planning.blox.torch.layers import BaseProcessingNet, FCBlock
+from blox import AttrDict
+from blox.basic_types import map_dict, listdict2dictlist, subdict
+from blox.torch.dist import stack
+from blox.torch.layers import BaseProcessingNet, FCBlock
 
 
 # Note: this post has an example custom implementation of LSTM from which we can derive a ConvLSTM/TreeLSTM
@@ -276,7 +276,7 @@ class MLPLSTMCellInitializer(LSTMCellInitializer):
     """Initializes hidden with MLP that gets start and goal image encodings as input."""
     def __init__(self, hp, cell, input_sz):
         super().__init__(hp, cell)
-        from recursive_planning.blox.torch.subnetworks import Predictor    # to avoid cyclic import
+        from blox.torch.subnetworks import Predictor    # to avoid cyclic import
         self.net = Predictor(self._hp, input_sz, output_size=2 * self._hidden_size, spatial=False,
                              num_layers=self._hp.init_mlp_layers, mid_size=self._hp.init_mlp_mid_sz)
 

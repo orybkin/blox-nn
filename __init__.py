@@ -1,1 +1,1 @@
-from recursive_planning.blox.core import *
+from blox.core import *

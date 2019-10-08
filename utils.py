@@ -3,7 +3,7 @@ import heapq
 import time
 from contextlib import contextmanager
 
-from recursive_planning.blox.tensor.ops import map_recursive_list, map_recursive
+from blox.tensor.ops import map_recursive_list, map_recursive
 
 
 class AverageMeter(object):

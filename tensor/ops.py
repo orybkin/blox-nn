@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from recursive_planning.blox.basic_types import map_dict, listdict2dictlist
-from recursive_planning.blox.tensor import ndim
-from recursive_planning.blox.core import optional
+from blox.tensor import ndim
+from blox.basic_types import map_dict, listdict2dictlist
+from blox.core import optional
 
 
 def add_n_dims(generalized_tensor, n, dim=-1):

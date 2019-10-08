@@ -1,11 +1,11 @@
 import math
 from functools import partial
 
-import torch.nn as nn
-from recursive_planning.blox.utils import HasParameters
-from recursive_planning.blox.torch.modules import ConcatSequential
-from recursive_planning.blox import AttrDict
 import torch.nn as init
+import torch.nn as nn
+from blox.utils import HasParameters
+from blox import AttrDict
+from blox.torch.modules import ConcatSequential
 
 
 def init_weights_xavier(m):

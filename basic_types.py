@@ -3,7 +3,7 @@ import re
 from functools import reduce
 
 import numpy as np
-from recursive_planning.blox import AttrDict
+from blox import AttrDict
 
 
 def dict_concat(d1, d2):
