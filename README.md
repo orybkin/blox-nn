@@ -1,4 +1,4 @@
-# blox-nn
+# Blox
 _Blox_ is a high-level library of building blox for deep neural networks in pytorch.
 
 # Examples
