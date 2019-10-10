@@ -125,11 +125,15 @@ def setup_variational_inference(hp, x_dim, cond_dim):
 class CVAE(nn.Module, ProbabilisticModel):
     """ A simple conditional VAE (Sohn et al., 2015) class. """
     
-    def __init__(self, hp, x_dim, cond_dim):
+    def __init__(self, hp, x_dim, cond_dim, generator=None):
         self._hp = hp
         super().__init__()
-        self.gen = Predictor(hp, input_dim=hp.nz_vae + cond_dim, output_dim=x_dim)  # generation
-        self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)  # inference, prior
+        
+        if generator is None:
+            generator = Predictor(hp, input_dim=hp.nz_vae + cond_dim, output_dim=x_dim)
+        self.gen = generator
+        self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
+        
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
         # self.prior = GaussianPredictor(hp, input_dim=cond_dim, gaussian_dim=hp.nz_vae)  # prior
         
@@ -153,5 +157,4 @@ class CVAE(nn.Module, ProbabilisticModel):
         losses.kl = KLDivLoss(self._hp.kl_weight, breakdown=1)(outputs.q_z, outputs.p_z)
 
         return losses
-    
     
