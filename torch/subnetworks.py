@@ -6,16 +6,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from blox.torch.ops import apply_linear
-from blox.torch.ops import like, make_one_hot, mask_out
 from blox import AttrDict
 from blox.tensor.ops import broadcast_final, batch_apply, map_recursive, batchwise_index, \
     batchwise_assign, remove_spatial, concat_inputs
-from blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from blox.torch.losses import CELoss, KLDivLoss
+from blox.torch.losses import CELoss
 from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential
+from blox.torch.ops import apply_linear
+from blox.torch.ops import like, make_one_hot, mask_out
 from blox.torch.recurrent_modules import BaseProcessingLSTM, \
     BidirectionalLSTM, BareLSTMCell
 from torch import Tensor
@@ -23,14 +22,14 @@ from torch.distributions.one_hot_categorical import OneHotCategorical
 
 
 class Predictor(BaseProcessingNet):
-    def __init__(self, hp, input_size, output_size, num_layers=None, detached=False, spatial=True,
+    def __init__(self, hp, input_dim, output_dim, num_layers=None, detached=False, spatial=True,
                  final_activation=None, mid_size=None):
         self.spatial = spatial
         mid_size = hp.nz_mid if mid_size is None else mid_size
         if num_layers is None:
             num_layers = hp.n_processing_layers
 
-        super().__init__(input_size, mid_size, output_size, num_layers=num_layers, builder=hp.builder,
+        super().__init__(input_dim, mid_size, output_dim, num_layers=num_layers, builder=hp.builder,
                          detached=detached, final_activation=final_activation)
 
     def forward(self, *inp):
@@ -357,121 +356,6 @@ class MultiheadAttention(nn.Module):
     def log_outputs_stateful(self, step, log_images, phase, logger):
         if phase == 'train':
             logger.log_scalar(self.temperature, 'attention_softmax_temp', step, phase)
-
-
-class GaussianPredictor(Predictor):
-    def __init__(self, hp, input_dim, gaussian_dim=None, spatial=False):
-        if gaussian_dim is None:
-            gaussian_dim = hp.nz_vae
-            
-        super().__init__(hp, input_dim, gaussian_dim * 2, spatial=spatial)
-    
-    def forward(self, *inputs):
-        return Gaussian(super().forward(*inputs)).tensor()
-
-
-class ApproximatePosterior(GaussianPredictor):
-    def __init__(self, hp):
-        super().__init__(hp, hp.nz_enc * 3)
-
-
-class LearnedPrior(GaussianPredictor):
-    def __init__(self, hp):
-        super().__init__(hp, hp.nz_enc * 2)
-
-
-class FixedPrior(nn.Module):
-    def __init__(self, hp):
-        super().__init__()
-        self.hp = hp
-
-    def forward(self, e_l, *args):  # ignored because fixed prior
-        return UnitGaussian([e_l.shape[0], self.hp.nz_vae], self.hp.device).tensor()
-
-
-class VariationalInference2LayerSharedPQ(nn.Module):
-    def __init__(self, hp):
-        super().__init__()
-        self.q1 = GaussianPredictor(hp, hp.nz_enc * 3, hp.nz_vae * 2)
-        self.q2 = GaussianPredictor(hp, hp.nz_vae + 2 * hp.nz_enc, hp.nz_vae2 * 2)  # inputs are two parents and z1
-
-    def forward(self, e_l, e_r, e_tilde):
-        g1 = self.q1(e_l, e_r, e_tilde)
-        z1 = Gaussian(g1).sample()
-        g2 = self.q2(z1, e_l, e_r)
-        return SequentialGaussian_SharedPQ(g1, z1, g2)
-
-
-class TwolayerPriorSharedPQ(nn.Module):
-    def __init__(self, hp, p1, q_p_shared):
-        super().__init__()
-        self.p1 = p1
-        self.q_p_shared = q_p_shared
-
-    def forward(self, e_l, e_r):
-        g1 = self.p1(e_l, e_r)
-        z1 = Gaussian(g1).sample()
-        g2 = self.q_p_shared(z1, e_l, e_r)  # make sure its the same order of arguments as in usage above!!
-
-        return SequentialGaussian_SharedPQ(g1, z1, g2)
-
-
-def get_prior(hp):
-    if hp.prior_type == 'learned':
-        return LearnedPrior(hp)
-    elif hp.prior_type == 'fixed':
-        return FixedPrior(hp)
-
-
-def setup_variation_inference(hp):
-    if hp.var_inf == '2layer':
-        q = VariationalInference2LayerSharedPQ(hp)
-        p = TwolayerPriorSharedPQ(hp, get_prior(hp), q.p_q_shared)
-
-    elif hp.var_inf == 'standard':
-        q = ApproximatePosterior(hp)
-        p = get_prior(hp)
-
-    elif hp.var_inf == 'deterministic':
-        q = FixedPrior(hp)
-        p = FixedPrior(hp)
-        
-    return q, p
-
-
-class AttentiveInference(nn.Module):
-    def __init__(self, hp, q, attention, run=True):
-        super().__init__()
-        self._hp = hp
-        self.run = run
-        self.q = q
-        self.attention = attention
-        self.deterministic = isinstance(self.q, FixedPrior)
-    
-    def forward(self, inputs, e_l, e_r, start_ind, end_ind, timestep=None):
-        if not self.run:
-            return self.get_dummy(e_l)
-        
-        output = AttrDict()
-        if self.deterministic:
-            output.q_z = self.q(e_l)
-            return output
-        
-        e_tilde, output.gamma = self.attention(inputs.inf_enc_seq, inputs.inf_enc_key_seq, e_l, e_r,
-                                               start_ind, end_ind, inputs, timestep)
-        output.q_z = self.q(e_l, e_r, e_tilde)
-        return output
-    
-    def loss(self, q_z, p_z):
-        if q_z.numel() == 0:
-            return {}
-        
-        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, store_raw=True))
-    
-    def get_dummy(self, e_l):
-        raise NotImplementedError('do we need to run inference in this case?')
-        # TODO do we need to run inference in this case?
-        return AttrDict(q_z=self.q.get_dummy())
 
 
 class SeqEncodingModule(nn.Module):

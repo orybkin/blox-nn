@@ -277,7 +277,7 @@ class MLPLSTMCellInitializer(LSTMCellInitializer):
     def __init__(self, hp, cell, input_sz):
         super().__init__(hp, cell)
         from blox.torch.subnetworks import Predictor    # to avoid cyclic import
-        self.net = Predictor(self._hp, input_sz, output_size=2 * self._hidden_size, spatial=False,
+        self.net = Predictor(self._hp, input_sz, output_dim=2 * self._hidden_size, spatial=False,
                              num_layers=self._hp.init_mlp_layers, mid_size=self._hp.init_mlp_mid_sz)
 
     def forward(self, *inputs):

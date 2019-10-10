@@ -1,6 +1,6 @@
-import torch
-from torch import __init__
+from contextlib import contextmanager
 
+import torch
 
 def safe_entropy(dist, dim=None, eps=1e-12):
     """Computes entropy even if some entries are 0."""
@@ -177,6 +177,28 @@ class ProbabilisticModel:
     def switch_to_inference(self):
         self._sample_prior = False
 
+    @contextmanager
+    def prior_mode(self):
+        """ To be used like: with model.prior_mode(): ...<do something>..."""
+        self.switch_to_prior()
+        yield
+        self.switch_to_inference()
+
+    # TODO add model class and make this subclass it
+    # @contextmanager
+    # def prior_mode(self):
+    #     """Sets validation parameters. To be used like: with model.val_mode(): ...<do something>..."""
+    #     self.call_children('switch_to_prior', ProbabilisticModel)
+    #     yield
+    #     self.call_children('switch_to_inference', ProbabilisticModel)
+    #
+    # def call_children(self, fn, cls):
+    #     def conditional_fn(module):
+    #         if isinstance(module, cls):
+    #             getattr(module, fn).__call__()
+    #
+    #     self.apply(conditional_fn)
+    
 
 def get_fixed_prior(tensor, bs=None, dim=None):
     if dim is not None:
