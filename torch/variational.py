@@ -126,8 +126,19 @@ class CVAE(nn.Module, ProbabilisticModel):
     """ A simple conditional VAE (Sohn et al., 2015) class. """
     
     def __init__(self, hp, x_dim, cond_dim, generator=None):
+        """
+        
+        :param hp: an object with attributes:
+            var_inf: can be ['standard', 'deterministic']
+            prior_type: can be ['learned', 'fixed']
+            nz_vae: # of dim in the vae latent
+        :param x_dim:
+        :param cond_dim:
+        :param generator:
+        """
         self._hp = hp
-        super().__init__()
+        nn.Module.__init__(self)
+        ProbabilisticModel.__init__(self)
         
         if generator is None:
             generator = Predictor(hp, input_dim=hp.nz_vae + cond_dim, output_dim=x_dim)
@@ -150,7 +161,7 @@ class CVAE(nn.Module, ProbabilisticModel):
     
         output.mu = self.gen(output.z, cond)
         
-        pass
+        return output
     
     def loss(self, inputs, outputs):
         losses = AttrDict()
