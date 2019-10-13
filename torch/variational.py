@@ -170,7 +170,7 @@ class CVAE(nn.Module, ProbabilisticModel):
     
     def loss(self, inputs, outputs):
         losses = AttrDict()
-        losses.kl = KLDivLoss(self._hp.kl_weight, breakdown=1)(outputs.q_z, outputs.p_z)
+        losses.kl = KLDivLoss(self._hp.kl_weight, breakdown=1)(outputs.q_z, outputs.p_z, reduction=[-1])
 
         return losses
     

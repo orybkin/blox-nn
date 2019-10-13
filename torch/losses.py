@@ -22,9 +22,15 @@ class Loss():
         :return:
         """
         error = self.compute(*args, **kwargs) * weights
-        if reduction != 'mean':
+        
+        if reduction == 'mean':
+            value = error.mean()
+        elif isinstance(reduction, list):
+            value = error.sum(reduction).mean()
+        else:
             raise NotImplementedError
-        loss = AttrDict(value=error.mean(), weight=self.weight)
+        loss = AttrDict(value=value, weight=self.weight)
+        
         if self.breakdown is not None:
             reduce_dim = get_dim_inds(error)[:self.breakdown] + get_dim_inds(error)[self.breakdown+1:]
             loss.breakdown = error.detach().mean(reduce_dim)
