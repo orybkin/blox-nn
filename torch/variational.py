@@ -4,6 +4,7 @@ from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
 from blox.torch.ops import broadcast_final
 import torch.nn as nn
+import torch
 
 
 class GaussianPredictor(Predictor):
@@ -34,7 +35,7 @@ class FixedPrior(nn.Module):
         self.hp = hp
 
     def forward(self, cond, *args):  # ignored because fixed prior
-        return UnitGaussian([cond.shape[0], self.hp.nz_vae], self.hp.device).tensor()
+        return UnitGaussian([cond.shape[0], self.hp.nz_vae], cond.device).tensor()
 
 
 class VariationalInference2LayerSharedPQ(nn.Module):
@@ -125,7 +126,7 @@ def setup_variational_inference(hp, x_dim, cond_dim):
 class CVAE(nn.Module, ProbabilisticModel):
     """ A simple conditional VAE (Sohn et al., 2015) class. """
     
-    def __init__(self, hp, x_dim, cond_dim, generator=None):
+    def __init__(self, hp, x_dim, cond_dim=0, generator=None):
         """
         
         :param hp: an object with attributes:
@@ -139,6 +140,8 @@ class CVAE(nn.Module, ProbabilisticModel):
         self._hp = hp
         nn.Module.__init__(self)
         ProbabilisticModel.__init__(self)
+        if cond_dim == 0:
+            assert hp.prior_type == 'fixed'
         
         if generator is None:
             generator = Predictor(hp, input_dim=hp.nz_vae + cond_dim, output_dim=x_dim)
@@ -148,8 +151,10 @@ class CVAE(nn.Module, ProbabilisticModel):
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
         # self.prior = GaussianPredictor(hp, input_dim=cond_dim, gaussian_dim=hp.nz_vae)  # prior
         
-    def forward(self, x, cond):
+    def forward(self, x, cond=None):
         output = AttrDict()
+        if cond is None:
+            cond = torch.zeros_like(x)[..., :0]  # If no conditioning, put a placeholder
         
         output.q_z = self.inf(x, cond)
         output.p_z = self.prior(cond)  # the input is only used to read the batchsize atm
