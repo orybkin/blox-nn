@@ -59,6 +59,16 @@ def ar2ten(array, device):
     return torch.from_numpy(array).to(device)
 
 
+def list2ten(list, device=None, dtype=None):
+    ten = torch.from_numpy(np.asarray(list))
+    if device is not None:
+        ten = ten.to(device)
+    if dtype is not None:
+        ten = torch.Tensor.type(ten, dtype)
+    
+    return ten
+
+
 def mask_out(tensor, start_ind, end_ind, value, dim=1):
     """ Set the elements before start_ind and after end_ind (both inclusive) to the value. """
     if dim != 1:
