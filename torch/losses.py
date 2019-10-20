@@ -64,6 +64,13 @@ class CELoss(Loss):
     compute = staticmethod(torch.nn.functional.cross_entropy)
     
 
+class NLL(Loss):
+    # Note that cross entropy is an instance of NLL, as is L2 loss.
+    def compute(self, estimates, targets):
+        nll = estimates.nll(targets)
+        return nll
+    
+
 class PenaltyLoss(Loss):
     def compute(self, val):
         """Computes weighted mean of val as penalty loss."""

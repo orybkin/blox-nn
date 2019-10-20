@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 
+import numpy as np
 import torch
 
 def safe_entropy(dist, dim=None, eps=1e-12):
@@ -23,7 +24,7 @@ class Gaussian:
     def __init__(self, mu, log_sigma=None):
         """
         
-        :param mu:
+        :param mu: the mean. this parameter should have the shape of the desired distribution
         :param log_sigma: If none, mu is divided into two chunks, mu and log_sigma
         """
         if log_sigma is None:
@@ -36,13 +37,17 @@ class Gaussian:
         self._sigma = None
         
     def sample(self):
-        return self.mu + self.sigma * torch.randn_like(self.sigma)
+        return self.mu + self.sigma * torch.randn_like(self.mu)
 
     def kl_divergence(self, other):
         """Here self=q and other=p and we compute KL(q, p)"""
         return (other.log_sigma - self.log_sigma) + (self.sigma ** 2 + (self.mu - other.mu) ** 2) \
                / (2 * other.sigma ** 2) - 0.5
 
+    def nll(self, x):
+        # Negative log likelihood (probability)
+        return 0.5 * torch.pow((x - self.mu) / self.sigma, 2) + self.log_sigma + 0.5 * np.log(2 * np.pi)
+    
     @property
     def sigma(self):
         if self._sigma is None:
@@ -82,7 +87,7 @@ class Gaussian:
  
     def tensor(self):
         return torch.cat([self.mu, self.log_sigma], dim=-1)
-
+    
 
 class UnitGaussian(Gaussian):
     def __init__(self, size, device):
