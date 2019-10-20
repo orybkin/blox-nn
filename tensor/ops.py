@@ -17,6 +17,11 @@ def broadcast_final(t1, t2):
     return add_n_dims(t1, len(t2.shape) - len(t1.shape))
 
 
+def broadcast_initial(t1, t2):
+    """ Adds leading dimensions to t1 to match t2 """
+    return add_n_dims(t1, len(t2.shape) - len(t1.shape), dim=0)
+
+
 def get_dim_inds(generalized_tensor):
     """ Returns a tuple 0..length, where length is the number of dimensions of the tensors"""
     return tuple(range(len(generalized_tensor.shape)))
