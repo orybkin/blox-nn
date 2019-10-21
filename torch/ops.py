@@ -69,6 +69,10 @@ def list2ten(list, device=None, dtype=None):
     return ten
 
 
+def dim2list(tensor, dim):
+    return [t.squeeze(dim) for t in torch.split(tensor, 1, dim)]
+
+
 def mask_out(tensor, start_ind, end_ind, value, dim=1):
     """ Set the elements before start_ind and after end_ind (both inclusive) to the value. """
     if dim != 1:
@@ -95,9 +99,10 @@ def log_sum_exp(tensor, dim=-1):
     # return (tensor - max[..., None]).exp().sum(dim).log() + max
 
 
-def combine_dim(x, dim_begin, dim_end):
+def combine_dim(x, dim_begin, dim_end=None):
+    if dim_end is None: dim_end = len(x.shape)
     combined_shape = list(x.shape[:dim_begin]) + [-1] + list(x.shape[dim_end:])
-    return x.view(combined_shape)
+    return x.reshape(combined_shape)
 
 
 def like(func, tensor):
