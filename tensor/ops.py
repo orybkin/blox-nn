@@ -135,6 +135,8 @@ def map_recursive_list(fn, tensors):
     return make_recursive_list(fn)(tensors)
 
 
+rmap = map_recursive
+rmap_list = map_recursive_list
 recursively = make_recursive
 
 

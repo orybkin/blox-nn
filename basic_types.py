@@ -23,7 +23,7 @@ def listdict2dictlist(LD):
     
     # Take intersection of keys
     keys = reduce(lambda x,y: x & y, (map(lambda d: d.keys(), LD)))
-    return AttrDict({k: [dic[k] for dic in LD] for k in keys})
+    return type(LD[0])({k: [dic[k] for dic in LD] for k in keys})
 
 
 def dictlist2listdict(DL):
