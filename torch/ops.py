@@ -1,6 +1,7 @@
 from functools import partial
 
 import torch.nn as nn
+import torch.nn.functional as F
 from blox.tensor.ops import *
 
 
@@ -117,3 +118,31 @@ def slice_tensor(tensor, start, step, dim):
         return tensor[:, start::step]
     else:
         raise NotImplementedError
+    
+
+def pad_to(tensor, size, dim=-1, mode='back'):
+    kwargs = dict()
+    
+    padding = size - tensor.shape[dim]
+    if mode == 'front':
+        kwargs['pad_front'] = padding
+    else:
+        kwargs['pad_back'] = padding
+        
+    return pad(tensor, **kwargs, dim=dim)
+
+
+def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1):
+    """ Pads a tensor at the specified dimension"""
+    l = len(generalized_tensor.shape)
+    if dim < 0:
+        dim = l + dim
+        
+    size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
+    # pad takes element in reversed order for some reason
+    
+    if isinstance(generalized_tensor, torch.Tensor):
+        return F.pad(generalized_tensor, list(reversed(size)))
+    elif isinstance(generalized_tensor, np.ndarray):
+        size = list(zip(size[::2], size[1::2]))
+        return np.pad(generalized_tensor, size, mode='constant')

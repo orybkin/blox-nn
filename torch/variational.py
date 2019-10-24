@@ -129,7 +129,7 @@ def setup_variational_inference(hp, x_dim, cond_dim):
 class CVAE(nn.Module, ProbabilisticModel):
     """ A simple conditional VAE (Sohn et al., 2015) class. """
     
-    def __init__(self, hp, x_dim, cond_dim=0, generator=None, learn_beta=False):
+    def __init__(self, hp, x_dim, cond_dim=0, generator=None, learn_beta=False, beta=0):
         """
         
         :param hp: an object with attributes:
@@ -151,7 +151,7 @@ class CVAE(nn.Module, ProbabilisticModel):
         self.gen = generator
         self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
         
-        self.log_sigma = torch.nn.Parameter(torch.zeros(1)[0])
+        self.log_sigma = torch.nn.Parameter(torch.full((1,), beta)[0])
         self.log_sigma.requires_grad_(learn_beta)
         
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
