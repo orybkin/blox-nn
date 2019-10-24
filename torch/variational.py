@@ -73,6 +73,9 @@ class AttentiveInference(nn.Module):
         self.q = q
         self.attention = attention
         self.deterministic = isinstance(self.q, FixedPrior)
+
+        self.log_sigma = torch.nn.Parameter(torch.full((1,), 0)[0])
+        self.log_sigma.requires_grad_(hp.learn_beta)
     
     def forward(self, inputs, e_l, e_r, start_ind, end_ind, timestep=None):
         if not self.run:
@@ -92,7 +95,7 @@ class AttentiveInference(nn.Module):
         if q_z.numel() == 0:
             return {}
         
-        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, store_raw=True))
+        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, store_raw=True, reduction=[-1, -2]))
     
     def get_dummy(self, e_l):
         raise NotImplementedError('do we need to run inference in this case?')
