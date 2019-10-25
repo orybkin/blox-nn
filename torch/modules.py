@@ -161,6 +161,32 @@ class LinearUpdater(Updater):
             logger.log_scalar(self.parameter, self.name, step, phase)
 
 
+class ConstantUpdater(Updater):
+    def __init__(self, parameter, n_iter, name=None):
+        """
+        Keeps the parameter constant for n_iter
+        """
+        super().__init__()
+        
+        assert parameter.numel() == 1
+        # assert not parameter.requires_grad
+        self.parameter = parameter
+        self.n_iter = n_iter
+        self.name = name
+        self.val = parameter.data
+        
+    def step(self):
+        # TODO this should depend on the global step
+        if self.it < self.n_iter:
+            self.parameter.data = self.val.to(self.parameter.device)
+        
+        super().step()
+    
+    def log_outputs_stateful(self, step, log_images, phase, logger):
+        if self.name:
+            logger.log_scalar(self.parameter, self.name, step, phase)
+            
+
 def num_parameters(model, level=0):
     """  Returns the number of parameters used in a module.
     
