@@ -9,6 +9,7 @@ import sys
 import numbers
 
 from blox.torch.core import ten2ar, ar2ten
+from blox.tensor.core import find_element
 from blox import rmap
 
 
@@ -24,10 +25,7 @@ class adapter:
         """ Wrapping """
         
         def wrapper(generalized_tensor, *args, **kwargs):
-            # TODO find tensor
-            found_tensor = generalized_tensor
-            if isinstance(generalized_tensor, list):
-                found_tensor = generalized_tensor[0]
+            found_tensor = find_element(generalized_tensor)
             
             if isinstance(found_tensor, torch.Tensor):
                 fn = self.torch_fn
@@ -80,24 +78,31 @@ class Ndim():
         
     @staticmethod
     def torched(fn):
-        """ A decorator that allows a numpy function operate on torch tensors """
+        """ A decorator that allows a numpy function operate on torch tensors.
+         Warning: this does NOT make the function differentiable """
         
         def wrapper(*args):
             # TODO support **kwargs
             
-            # TODO find tensor
-            tensor = args[0]
-            device = tensor.device
-
-            convert_to = lambda el: ten2ar(el) if isinstance(el, torch.Tensor) else el
-            ar_args = rmap(convert_to, args)
+            found_tensor = find_element(args)
+            if isinstance(found_tensor, torch.Tensor):
+                convert = True
+            elif isinstance(found_tensor, np.ndarray):
+                convert = False
+            else:
+                raise NotImplementedError
+                
+            if convert:
+                convert_to = lambda el: ten2ar(el) if isinstance(el, torch.Tensor) else el
+                args = rmap(convert_to, args)
             
-            result = fn(*ar_args)
+            result = fn(*args)
             
-            convert_fro = lambda el: ar2ten(el, device) if isinstance(el, np.ndarray) else el
-            ten_result = rmap(convert_fro, result)
+            if convert:
+                convert_fro = lambda el: ar2ten(el, found_tensor.device) if isinstance(el, np.ndarray) else el
+                result = rmap(convert_fro, result)
             
-            return ten_result
+            return result
         
         return wrapper
     

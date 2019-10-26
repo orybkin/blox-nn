@@ -1,3 +1,5 @@
+from functools import partial
+
 from blox.basic_types import map_dict, listdict2dictlist
 import torch
 
@@ -11,8 +13,8 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False, ):
     list of arguments
     :param unshape_inputs: if true, reshapes the inputs back to original (in case they have references to classes)"""
     
-    reference_tensor, success = find_tensor(tensors, min_dim=2)
-    if not success:
+    reference_tensor = find_tensor(tensors, min_dim=2)
+    if not isinstance(reference_tensor, torch.Tensor):
         raise ValueError("couldn't find a reference tensor")
     
     batch, time = reference_tensor.shape[:2]
@@ -32,26 +34,42 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False, ):
     return output_reshaped_back
 
 
-def find_tensor(tensors, min_dim=None):
+def find(inp, success_fn):
     """ Finds a single tensor in the structure """
 
-    if isinstance(tensors, list) or isinstance(tensors, tuple):
-        tensors_items = list(tensors)
-    elif isinstance(tensors, dict):
-        tensors_items = list(tensors.items())
-    else:
-        # Base case, if not dict or iterable
-        success = isinstance(tensors, torch.Tensor)
-        if min_dim is not None: success = success and len(tensors.shape) >= min_dim
-        return tensors, success
+    def rec_find(structure):
+        if isinstance(structure, list) or isinstance(structure, tuple):
+            items = list(structure)
+        elif isinstance(structure, dict):
+            items = list(structure.items())
+        else:
+            # Base case, if not dict or iterable
+            success = success_fn(structure)
+            return structure, success
+    
+        # If dict or iterable, iterate and find a tensor
+        for item in items:
+            result, success = rec_find(item)
+            if success:
+                return result, success
 
-    # If dict or iterable, iterate and find a tensor
-    for tensors_item in tensors_items:
-        tensors_result, success = find_tensor(tensors_item)
-        if success:
-            return tensors_result, success
+        return None, False
+    
+    return rec_find(inp)[0]
 
-    return None, False
+
+def find_tensor(structure, min_dim=None):
+    def success_fn(x):
+        success = isinstance(x, torch.Tensor)
+        if min_dim is not None:
+            success = success and len(x.shape) >= min_dim
+            
+        return success
+    
+    return find(structure, success_fn)
+
+
+find_element = lambda structure: find(structure, success_fn=lambda x: True)
 
 
 def make_recursive(fn, *argv, **kwargs):
