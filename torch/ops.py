@@ -3,6 +3,7 @@ from functools import partial
 import torch.nn as nn
 import torch.nn.functional as F
 from blox.tensor.ops import *
+from blox.torch.core import *
 
 
 def apply_linear(layer, val, dim):
@@ -50,14 +51,6 @@ def batch_cdist(x1, x2, reduction='sum'):
 
 def cdist(x1, x2, reduction='sum'):
     return batch_cdist(x1[None], x2[None], reduction=reduction)[0]
-
-
-def ten2ar(tensor):
-    return tensor.detach().cpu().numpy()
-
-
-def ar2ten(array, device):
-    return torch.from_numpy(array).to(device)
 
 
 def list2ten(list, device=None, dtype=None):

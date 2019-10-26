@@ -6,9 +6,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from blox import AttrDict
-from blox.tensor.ops import broadcast_final, batch_apply, map_recursive, batchwise_index, \
+from blox import AttrDict, batch_apply
+from blox.tensor.ops import broadcast_final, batchwise_index, \
     batchwise_assign, remove_spatial, concat_inputs
+from blox.tensor.core import map_recursive
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
 from blox.torch.losses import CELoss
