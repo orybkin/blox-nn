@@ -8,6 +8,9 @@ import torch
 import sys
 import numbers
 
+from blox.torch.core import ten2ar, ar2ten
+from blox import rmap
+
 
 class adapter:
     """ A function decorator that redirects the function to the appropriate numpy or torch analogue """
@@ -74,6 +77,29 @@ class Ndim():
     
     def __getattr__(self, name):
         return adapter(getattr(torch, name), getattr(np, name))(None)
+        
+    @staticmethod
+    def torched(fn):
+        """ A decorator that allows a numpy function operate on torch tensors """
+        
+        def wrapper(*args):
+            # TODO support **kwargs
+            
+            # TODO find tensor
+            tensor = args[0]
+            device = tensor.device
+
+            convert_to = lambda el: ten2ar(el) if isinstance(el, torch.Tensor) else el
+            ar_args = rmap(convert_to, args)
+            
+            result = fn(*ar_args)
+            
+            convert_fro = lambda el: ar2ten(el, device) if isinstance(el, np.ndarray) else el
+            ten_result = rmap(convert_fro, result)
+            
+            return ten_result
+        
+        return wrapper
     
     #TODO is there any way to incorporate tensor functions? I.e. tensor.ndim_reshape()
     #TODO make a class ndim.Ndim that is a wrapper around tensor/array that calls relevant methods
