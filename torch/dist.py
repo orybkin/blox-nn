@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import torch
+from torch import distributions
 
 def safe_entropy(dist, dim=None, eps=1e-12):
     """Computes entropy even if some entries are 0."""
@@ -18,7 +19,39 @@ def normalize(tensor, dim=1, eps=1e-7):
     return tensor / norm
 
 
-class Gaussian:
+class Distribution():
+    def nll(self, x):
+        raise NotImplementedError
+    
+    def sample(self, x):
+        raise NotImplementedError
+    
+    def kl_divergence(self, x):
+        raise NotImplementedError
+
+
+class Beta(Distribution):
+    """ A Beta distribution defined on [0,1]"""
+    def __init__(self, mu, log_nu):
+        self.dist = distributions.Beta(mu * log_nu.exp(), (1 - mu) * log_nu.exp())
+
+    def nll(self, x):
+        x = self.rescale(x)
+        # return (self.dist.concentration0 - 1) * x.log() + (self.dist.concentration1 - 1) * (1 - x).log() - self.log_norm
+        return -self.dist.log_prob(x)
+    
+    def rescale(self, x, eps=1e-7):
+        """ Rescale an input to be inside allowed range. Note: this operation is actually illegal but might be fine
+        with small epsilon"""
+        
+        return x * (1 - eps * 2) + eps
+    
+    @property
+    def log_norm(self):
+        return self.dist._log_normalizer(self.dist.concentration0, self.dist.concentration1)
+
+
+class Gaussian(Distribution):
     """ Represents a gaussian distribution """
     # TODO: implement a dict conversion function
     def __init__(self, mu, log_sigma=None):
@@ -96,7 +129,7 @@ class UnitGaussian(Gaussian):
         super().__init__(mu, log_sigma)
 
 
-class SequentialGaussian_SharedPQ:
+class SequentialGaussian_SharedPQ(Distribution):
     """ stacks two Gaussians """
     def __init__(self, g1, z1, g2):
         """
