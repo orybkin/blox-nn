@@ -19,6 +19,28 @@ def make_one_hot(index, length):
     return oh
 
 
+def first_nonzero(tensor, dim=-1):
+    """ Returns the first nonzero element of the tensor """
+
+    mask = (tensor != 0).float()
+    weight = tensor2indices(tensor, dim).float().flip(dim)
+    
+    return (mask * weight).argmax(dim)
+    
+    
+def tensor2indices(tensor, dim):
+    """ Returns a tensor with the shape of 'tensor' but values substituted with index along 'dim' """
+    l = len(tensor.shape)
+    if dim < 0:
+        dim = l + dim
+    
+    indices = torch.arange(tensor.shape[dim], device=tensor.device)
+    indices = add_n_dims(add_n_dims(indices, n=dim, dim=0), n=l - dim - 1)
+    indices = indices.expand(tensor.shape)
+    
+    return indices
+
+
 def batch_cdist(x1, x2, reduction='sum'):
     """ Compute batchwise L2 matrix using quadratic expansion. For each of n vectors in x1, compute L2 norm between it
     and each of m vectors in x2 and outputs the corresponding matrix.
