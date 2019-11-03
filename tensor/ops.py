@@ -51,6 +51,10 @@ def batchwise_assign(tensor, index, value):
     tensor[np.arange(bs), index] = value
 
 
+def one_hot(a, length):
+  return np.eye(length)[a.reshape(-1)]
+
+
 @optional()
 def remove_spatial(tensor):
     if len(tensor.shape) == 4 or len(tensor.shape) == 5:
