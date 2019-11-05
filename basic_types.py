@@ -78,7 +78,8 @@ def dot2nesteddict(dot_map_dict):
     }
     ```
     into its corresponding nested dict.
-
+    
+    Taken from rlkit by Vitchyr Pong
     http://stackoverflow.com/questions/16547643/convert-a-list-of-delimited-strings-to-a-tree-nested-dict-using-python
     :param dot_map_dict:
     :return:
@@ -112,6 +113,7 @@ def nested2dotdict(d, parent_key=''):
     """
     Convert a recursive dictionary into a flat, dot-map dictionary.
 
+    Taken from rlkit by Vitchyr Pong
     :param d: e.g. {'a': {'b': 2, 'c': 3}}
     :param parent_key: Used for recursion
     :return: e.g. {'a.b': 2, 'a.c': 3}
