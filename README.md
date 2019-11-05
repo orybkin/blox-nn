@@ -8,4 +8,4 @@ Coming soon
 Oh well. Maybe email one of us?
 
 # Contributors
-Oleh Rybkin (oleh@seas.upenn.edu), Karl Pertsch (pertsch@usc.edu)
+Oleh Rybkin (oleh@seas.upenn.edu), Karl Pertsch (pertsch@usc.edu), Frederik Ebert, Authors of Rectified Adam.
