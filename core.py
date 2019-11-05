@@ -1,5 +1,6 @@
 import inspect
 
+
 class AttrDict(dict):
     __setattr__ = dict.__setitem__
 
@@ -7,7 +8,7 @@ class AttrDict(dict):
         # Take care that getattr() raises AttributeError, not KeyError.
         # Required e.g. for hasattr(), deepcopy and OrderedDict.
         try:
-            return self.__getitem__(attr)
+            return dict.__getitem__(self, attr)
         except KeyError:
             raise AttributeError("Attribute %r not found" % attr)
 
