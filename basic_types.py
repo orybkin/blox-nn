@@ -24,7 +24,8 @@ def listdict2dictlist(LD):
     
     # Take intersection of keys
     keys = reduce(lambda x,y: x & y, (map(lambda d: d.keys(), LD)))
-    return type(LD[0])({k: [dic[k] for dic in LD] for k in keys})
+    # Note dict.__getitem__ is necessary for subclasses of dict that override getitem
+    return type(LD[0])({k: [dict.__getitem__(d, k) for d in LD] for k in keys})
 
 
 def dictlist2listdict(DL):
