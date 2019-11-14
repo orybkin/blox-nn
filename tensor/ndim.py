@@ -105,6 +105,36 @@ class Ndim():
             return result
         
         return wrapper
+
+    @staticmethod
+    def numpied(fn):
+        """ A decorator that allows a torch function operate on numpy tensors. """
+
+        def wrapper(*args):
+            # TODO support **kwargs
+            # TODO make cuda/cpu an option for decorator or discover it automatically
+    
+            found_tensor = find_element(args)
+            if isinstance(found_tensor, torch.Tensor):
+                convert = False
+            elif isinstance(found_tensor, np.ndarray):
+                convert = True
+            else:
+                raise NotImplementedError
+    
+            if convert:
+                convert_to = lambda el: ar2ten(el, 'cpu') if isinstance(el, np.ndarray) else el
+                args = rmap(convert_to, args)
+    
+            result = fn(*args)
+    
+            if convert:
+                convert_fro = lambda el: ten2ar(el) if isinstance(el, torch.Tensor) else el
+                result = rmap(convert_fro, result)
+    
+            return result
+
+        return wrapper
     
     #TODO is there any way to incorporate tensor functions? I.e. tensor.ndim_reshape()
     #TODO make a class ndim.Ndim that is a wrapper around tensor/array that calls relevant methods
