@@ -39,6 +39,27 @@ class Distribution():
         raise NotImplementedError
 
 
+class DiscreteGaussian(Distribution):
+    """ Implements a discrete distribution specified by mu and sigma, such that the probability is proportional to
+    the corresponding density function of a Gaussian. """
+    
+    # TODO this is not a great distribution because it suffers from the same instabilities as the Gaussian,
+    #  and even more. Define a better distribution based on the hypergeometric or negative hypergeometric.
+    
+    def __init__(self, mu, log_sigma, range):
+        self.mu = mu
+        self.log_sigma = log_sigma
+        
+        vals = torch.arange(range).to(device=mu.device)
+        gauss = torch.distributions.Normal(self.mu[..., None], self.log_sigma.exp()[..., None])
+        cont_p = gauss.log_prob(vals).exp()
+        disc_p = cont_p / cont_p.sum(-1, keepdim=True)
+        self.categorical = torch.distributions.Categorical(probs=disc_p)
+    
+    def nll(self, x):
+        return -self.categorical.log_prob(x)
+    
+
 class Beta(Distribution):
     """ A Beta distribution defined on [0,1]"""
     def __init__(self, mu, log_nu):
