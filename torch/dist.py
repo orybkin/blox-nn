@@ -18,6 +18,15 @@ def normalize(tensor, dim=1, eps=1e-7):
     norm = torch.clamp(tensor.sum(dim, keepdim=True), eps)
     return tensor / norm
 
+def limit_exponent(tensor, min):
+    """ Adds a constant to the tensor that brings the exponent of it to the desired min value.
+    The constant is treated as a constant for autodiff (is detached)
+    This is useful if one has a log variance and wants to impose a limit on the variance itself.  """
+    
+    diff = (tensor.exp() + min).log() - tensor
+    result_tensor = tensor + diff.detach()
+    
+    return result_tensor
 
 class Distribution():
     def nll(self, x):
