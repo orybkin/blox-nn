@@ -127,18 +127,32 @@ def setup_variational_inference(hp, x_dim, cond_dim):
     
 
 class CVAE(nn.Module, ProbabilisticModel):
-    """ A simple conditional VAE (Sohn et al., 2015) class. """
+    """ A simple conditional VAE (Sohn et al., 2015) class.
     
-    def __init__(self, hp, x_dim, cond_dim=0, generator=None, learn_beta=False, beta=0):
+    A conditional VAE learns to model a variable x with a latent variable z given some context cond.
+    Specifically, it learns p(x|z,cond) as well as p(z|cond), and an approximate inference distribution q(z|x,cond).
+    It is possible to use this class as a simple VAE by setting cond_dim=0.
+    
+    By default, the CVAE is going to run in the inference mode, i.e. produce reconstructions of input x.
+    To switch the CVAE to the sampling mode, use `with vae.prior_mode():` context or the vae.switch_to_prior(),
+    vae.switch_to_inference() switches.
+    
+    The CVAE class contains loss computation for the KL divergence, that can be used as:
+    out = vae(inp)
+    loss = vae.loss(inp, out)
+    """
+    
+    def __init__(self, hp, x_dim, cond_dim=0, generator=None, learn_beta=True, log_beta=0):
         """
         
         :param hp: an object with attributes:
             var_inf: can be ['standard', 'deterministic']
             prior_type: can be ['learned', 'fixed']
             nz_vae: # of dim in the vae latent
-        :param x_dim:
-        :param cond_dim:
-        :param generator:
+            kl_weight: the weight on the KL-divergence loss (usually set to 1)
+        :param x_dim: the dimension of the data that are going to be modelled
+        :param cond_dim: the dimension of the context
+        :param generator (optional): a module that produces the x given the z and the context
         """
         self._hp = hp
         nn.Module.__init__(self)
@@ -151,7 +165,7 @@ class CVAE(nn.Module, ProbabilisticModel):
         self.gen = generator
         self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
         
-        self.log_sigma = torch.nn.Parameter(torch.full((1,), beta)[0])
+        self.log_sigma = torch.nn.Parameter(torch.full((1,), log_beta)[0])
         self.log_sigma.requires_grad_(learn_beta)
         
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
