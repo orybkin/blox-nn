@@ -7,5 +7,5 @@ Coming soon
 # Documentation
 Oh well. Maybe email one of us?
 
-# Contributors
+# Contributors and Acknowledgements
 Oleh Rybkin (oleh@seas.upenn.edu), Karl Pertsch (pertsch@usc.edu), Frederik Ebert, Authors of Rectified Adam, Vitchyr Pong.
