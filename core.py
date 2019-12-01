@@ -14,6 +14,11 @@ class AttrDict(dict):
 
     def rename(self, old, new):
         self[new] = self.pop(old)
+        
+    def get(self, key, default=None):
+        if key not in self:
+            return default
+        return self.__getitem__(key)
 
     def __getstate__(self): return self
     def __setstate__(self, d): self = d

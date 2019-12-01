@@ -111,6 +111,16 @@ def get_prior(hp, cond_dim):
 
 
 def setup_variational_inference(hp, x_dim, cond_dim):
+    """ Creates the inference and the prior networks
+    
+    :param hp: an object with attributes:
+        var_inf: can be ['standard', 'deterministic']
+        prior_type: can be ['learned', 'fixed']
+        nz_vae: # of dim in the vae latent
+    :param x_dim:
+    :param cond_dim:
+    :return:
+    """
     if hp.var_inf == '2layer':
         inf = VariationalInference2LayerSharedPQ(hp)
         prior = TwolayerPriorSharedPQ(hp, get_prior(hp, cond_dim), inf.p_q_shared)

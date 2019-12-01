@@ -6,18 +6,17 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from blox import AttrDict, batch_apply
-from blox.tensor.ops import broadcast_final, batchwise_index, \
-    batchwise_assign, remove_spatial, concat_inputs
+from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, remove_spatial, concat_inputs
 from blox.tensor.core import map_recursive
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from blox.torch.losses import CELoss
+from blox.torch.losses import CELoss, L2Loss
 from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential
 from blox.torch.ops import apply_linear
 from blox.torch.ops import like, make_one_hot, mask_out
-from blox.torch.recurrent_modules import BaseProcessingLSTM, \
-    BidirectionalLSTM, BareLSTMCell
+from blox.torch.recurrent_modules import BaseProcessingLSTM, BidirectionalLSTM, BareLSTMCell
 from torch import Tensor
 from torch.distributions.one_hot_categorical import OneHotCategorical
 
@@ -139,6 +138,28 @@ class Decoder(nn.Module):
 
         decoder_inputs = AttrDict(input=encodings, skips=seq_skips, pixel_source=pixel_source)
         return batch_apply(decoder_inputs, self, separate_arguments=True)
+
+    def loss(self, inputs, model_output, extra_action=True, first_image=True):
+        dense_losses = AttrDict()
+    
+        loss_gt = inputs.demo_seq
+        loss_pad_mask = inputs.pad_mask
+        actions_pad_mask = inputs.pad_mask[:, :-1]
+        loss_actions = model_output.actions
+        if not first_image:
+            loss_gt = loss_gt[:, 1:]
+            loss_pad_mask = loss_pad_mask[:, 1:]
+        if extra_action:
+            loss_actions = loss_actions[:, :-1]
+    
+        dense_losses.dense_img_rec = L2Loss(self._hp.dense_img_rec_weight, breakdown=1) \
+            (model_output.images, loss_gt, weights=broadcast_final(loss_pad_mask, inputs.demo_seq))
+    
+        if self._hp.regress_actions:
+            dense_losses.dense_action_rec = L2Loss(self._hp.dense_action_rec_weight) \
+                (loss_actions, inputs.actions, weights=broadcast_final(actions_pad_mask, inputs.actions))
+    
+        return dense_losses
 
 
 class ConvDecoder(nn.Module):
