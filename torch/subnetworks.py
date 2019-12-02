@@ -6,19 +6,20 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
+from torch.distributions.one_hot_categorical import OneHotCategorical
 
 from blox import AttrDict, batch_apply
-from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, remove_spatial, concat_inputs
+from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, remove_spatial, concat_inputs, get_dim_inds
 from blox.tensor.core import map_recursive
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from blox.torch.losses import CELoss, L2Loss
-from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential
+from blox.torch.losses import CELoss, L2Loss, NLL
+from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential, ConstantUpdater
 from blox.torch.ops import apply_linear
 from blox.torch.ops import like, make_one_hot, mask_out
 from blox.torch.recurrent_modules import BaseProcessingLSTM, BidirectionalLSTM, BareLSTMCell
-from torch import Tensor
-from torch.distributions.one_hot_categorical import OneHotCategorical
+from blox.torch.dist import get_constant_parameter, Gaussian
 
 
 class Predictor(BaseProcessingNet):
@@ -79,7 +80,7 @@ class ConvEncoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """ A thin wrapper class that decides which decoder to build """
+    """ The decoder handles variation in the kinds of data that need to be decoded """
     def __init__(self, hp, regress_actions):
         super().__init__()
         self._hp = hp
@@ -104,7 +105,12 @@ class Decoder(nn.Module):
             
         if self.regress_actions:
             self.act_net = Predictor(hp, hp.nz_enc, hp.n_actions)
-
+            self.act_log_sigma = get_constant_parameter(0, hp.learn_beta)
+            self.decoder_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
+            
+        self.log_sigma = get_constant_parameter(0, hp.learn_beta)
+        self.decoder_sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
+        
     def forward(self, input, **kwargs):
         if not (self._hp.pixel_shift_decoder or self._hp.add_weighted_pixel_copy):
             kwargs.pop('pixel_source')
@@ -144,20 +150,25 @@ class Decoder(nn.Module):
     
         loss_gt = inputs.demo_seq
         loss_pad_mask = inputs.pad_mask
-        actions_pad_mask = inputs.pad_mask[:, :-1]
-        loss_actions = model_output.actions
         if not first_image:
             loss_gt = loss_gt[:, 1:]
             loss_pad_mask = loss_pad_mask[:, 1:]
-        if extra_action:
-            loss_actions = loss_actions[:, :-1]
-    
-        dense_losses.dense_img_rec = L2Loss(self._hp.dense_img_rec_weight, breakdown=1) \
-            (model_output.images, loss_gt, weights=broadcast_final(loss_pad_mask, inputs.demo_seq))
+
+        weights = broadcast_final(loss_pad_mask, inputs.demo_seq)
+        
+        avg_inds = get_dim_inds(loss_gt)[1:]
+        dense_losses.dense_img_rec = NLL(self._hp.dense_img_rec_weight, breakdown=1) \
+            (Gaussian(model_output.images, self.log_sigma), loss_gt, weights=weights, reduction=avg_inds)
     
         if self._hp.regress_actions:
-            dense_losses.dense_action_rec = L2Loss(self._hp.dense_action_rec_weight) \
-                (loss_actions, inputs.actions, weights=broadcast_final(actions_pad_mask, inputs.actions))
+            actions_pad_mask = inputs.pad_mask[:, :-1]
+            loss_actions = model_output.actions
+            if extra_action:
+                loss_actions = loss_actions[:, :-1]
+                
+            weights = broadcast_final(actions_pad_mask, inputs.actions)
+            dense_losses.dense_action_rec = NLL(self._hp.dense_action_rec_weight) \
+                (loss_actions, inputs.actions, weights=weights, reduction=[-1, -2])
     
         return dense_losses
 
