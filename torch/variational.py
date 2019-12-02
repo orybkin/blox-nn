@@ -2,7 +2,8 @@ from blox import AttrDict
 from blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ, ProbabilisticModel
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
-from blox.torch.ops import broadcast_final
+from blox.torch.dist import get_constant_parameter
+
 import torch.nn as nn
 import torch
 
@@ -74,9 +75,6 @@ class AttentiveInference(nn.Module):
         self.attention = attention
         self.deterministic = isinstance(self.q, FixedPrior)
 
-        self.log_sigma = torch.nn.Parameter(torch.full((1,), 0)[0])
-        self.log_sigma.requires_grad_(hp.learn_beta)
-    
     def forward(self, inputs, e_l, e_r, start_ind, end_ind, timestep=None):
         if not self.run:
             return self.get_dummy(e_l)
@@ -175,8 +173,7 @@ class CVAE(nn.Module, ProbabilisticModel):
         self.gen = generator
         self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
         
-        self.log_sigma = torch.nn.Parameter(torch.full((1,), log_beta)[0])
-        self.log_sigma.requires_grad_(learn_beta)
+        self.log_sigma = get_constant_parameter(log_beta, learn_beta)
         
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
         # self.prior = GaussianPredictor(hp, input_dim=cond_dim, gaussian_dim=hp.nz_vae)  # prior

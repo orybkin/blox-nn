@@ -25,7 +25,7 @@ class Loss():
         
         if reduction == 'mean':
             value = error.mean()
-        elif isinstance(reduction, list):
+        elif isinstance(reduction, list) or isinstance(reduction, tuple):
             value = error.sum(reduction).mean()
         else:
             raise NotImplementedError

@@ -46,7 +46,7 @@ class SVGCell(BaseCell, ProbabilisticModel):
         # Note: this might be unnecessary since the first frame is already provided above
         if more_context is not None:
             more_context = more_context[:, 0]
-        self.inf_lstm(first_x, context[:, 0], more_context)
+        self.inf_lstm(first_x, context, more_context)
     
     def forward(self, x, context=None, x_prime=None, more_context=None):
         """
@@ -75,7 +75,7 @@ class SVGCell(BaseCell, ProbabilisticModel):
         
         # x_t is fed back in as input (technically, it is unnecessary, however, the lstm is setup to observe a frame
         # every step because it observes one in the beginning).
-        output.x_t = self.gen_lstm(*pred_input).output
+        output.x = self.gen_lstm(*pred_input).output
         return output
     
     def reset(self):
