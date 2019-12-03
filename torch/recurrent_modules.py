@@ -213,7 +213,7 @@ class InitLSTMCell(CustomLSTMCell):
                                              self.get_state_size(), 1, hp.builder, FCBlock)
     
     def init_state(self, init_input):
-        init_input = init_input.view(self._hp.batch_size, self.reset_input_size)
+        init_input = init_input.view(init_input.shape[0], self.reset_input_size)
         self.hidden_var = self.init_module(init_input)
 
 
