@@ -2,9 +2,9 @@ from functools import partial
 
 import torch.nn as nn
 import torch.nn.functional as F
+from blox.tensor import ndim
 from blox.tensor.ops import *
 from blox.torch.core import *
-
 
 def apply_linear(layer, val, dim):
     """Applies a liner layer to the specified dimension."""
@@ -17,6 +17,23 @@ def make_one_hot(index, length):
     oh = index.new_zeros([index.shape[0], length])
     batchwise_assign(oh, index, 1)
     return oh
+
+
+@ndim.numpied
+def make_one_hot_image(index, height, width):
+    """ Converts 2-d indices to one-hot images"""
+
+    # Mask for the one values
+    mask_h = add_n_dims(torch.arange(height), len(index.shape) - 1, dim=0)[..., :, None]
+    mask_w = add_n_dims(torch.arange(width), len(index.shape) - 1, dim=0)[..., None, :]
+    mask = (mask_h == index[..., 0, None, None]) & (mask_w == index[..., 1, None, None])
+    
+    image = index.new_zeros(index.shape[:-1] + (height, width))
+    image[mask] = 1
+    # Add channels
+    image = image[..., None, :, :].repeat_interleave(3, -3)
+    
+    return image
 
 
 def first_nonzero(tensor, dim=-1):
