@@ -106,10 +106,10 @@ class Decoder(nn.Module):
         if self.regress_actions:
             self.act_net = Predictor(hp, hp.nz_enc, hp.n_actions)
             self.act_log_sigma = get_constant_parameter(0, hp.learn_beta)
-            self.decoder_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
+            self.act_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
             
-        self.log_sigma = get_constant_parameter(0, hp.learn_beta)
-        self.decoder_sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
+        self.log_sigma = get_constant_parameter(np.log(self._hp.kl_weight), hp.learn_beta)
+        self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
         
     def forward(self, input, **kwargs):
         if not (self._hp.pixel_shift_decoder or self._hp.add_weighted_pixel_copy):
