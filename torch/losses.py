@@ -14,7 +14,7 @@ class Loss():
         self.weight = weight
         self.breakdown = breakdown
     
-    def __call__(self, *args, weights=1, reduction='mean', store_raw=False, **kwargs):
+    def __call__(self, *args, weights=1, reduction='mean', log_error_arr=False, **kwargs):
         """
 
         :param estimates:
@@ -34,7 +34,7 @@ class Loss():
         if self.breakdown is not None:
             reduce_dim = get_dim_inds(error)[:self.breakdown] + get_dim_inds(error)[self.breakdown+1:]
             loss.breakdown = error.detach().mean(reduce_dim)
-        if store_raw:
+        if log_error_arr:
             loss.error_mat = error.detach()
         return loss
     

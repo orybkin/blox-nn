@@ -145,7 +145,7 @@ class Decoder(nn.Module):
         decoder_inputs = AttrDict(input=encodings, skips=seq_skips, pixel_source=pixel_source)
         return batch_apply(decoder_inputs, self, separate_arguments=True)
 
-    def loss(self, inputs, model_output, extra_action=True, first_image=True):
+    def loss(self, inputs, model_output, extra_action=True, first_image=True, log_error_arr=False):
         dense_losses = AttrDict()
     
         loss_gt = inputs.demo_seq
@@ -158,7 +158,8 @@ class Decoder(nn.Module):
         
         avg_inds = get_dim_inds(loss_gt)[1:]
         dense_losses.dense_img_rec = NLL(self._hp.dense_img_rec_weight, breakdown=1) \
-            (Gaussian(model_output.images, self.log_sigma), loss_gt, weights=weights, reduction=avg_inds)
+            (Gaussian(model_output.images, self.log_sigma),
+             loss_gt, weights=weights, reduction=avg_inds, log_error_arr=log_error_arr)
     
         if self._hp.regress_actions:
             actions_pad_mask = inputs.pad_mask[:, :-1]
@@ -168,7 +169,7 @@ class Decoder(nn.Module):
                 
             weights = broadcast_final(actions_pad_mask, inputs.actions)
             dense_losses.dense_action_rec = NLL(self._hp.dense_action_rec_weight) \
-                (loss_actions, inputs.actions, weights=weights, reduction=[-1, -2])
+                (loss_actions, inputs.actions, weights=weights, reduction=[-1, -2], log_error_arr=log_error_arr)
     
         return dense_losses
 
