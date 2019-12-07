@@ -23,6 +23,9 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+        
+    def __call__(self, *args, **kwargs):
+        self.update(*args, **kwargs)
 
 
 class PriorityQueue:
