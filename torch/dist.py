@@ -89,20 +89,20 @@ class Beta(Distribution):
 class Gaussian(Distribution):
     """ Represents a gaussian distribution """
     # TODO: implement a dict conversion function
-    def __init__(self, mu, log_sigma=None):
+    def __init__(self, mu, log_sigma=None, sigma=None):
         """
         
         :param mu: the mean. this parameter should have the shape of the desired distribution
         :param log_sigma: If none, mu is divided into two chunks, mu and log_sigma
         """
-        if log_sigma is None:
+        if log_sigma is None and sigma is None:
             if not isinstance(mu, torch.Tensor):
                 import pdb; pdb.set_trace()
             mu, log_sigma = torch.chunk(mu, 2, -1)
             
         self.mu = mu
-        self.log_sigma = log_sigma
-        self._sigma = None
+        self._log_sigma = log_sigma
+        self._sigma = sigma
         
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
@@ -110,7 +110,7 @@ class Gaussian(Distribution):
     def kl_divergence(self, other):
         """Here self=q and other=p and we compute KL(q, p)"""
         return (other.log_sigma - self.log_sigma) + (self.sigma ** 2 + (self.mu - other.mu) ** 2) \
-               / (2 * other.sigma ** 2) - 0.5
+                                                     / (2 * other.sigma ** 2) - 0.5
 
     def nll(self, x):
         # Negative log likelihood (probability)
@@ -119,8 +119,14 @@ class Gaussian(Distribution):
     @property
     def sigma(self):
         if self._sigma is None:
-            self._sigma = self.log_sigma.exp()
+            self._sigma = self._log_sigma.exp()
         return self._sigma
+    
+    @property
+    def log_sigma(self):
+        if self._log_sigma is None:
+            self._log_sigma = self._sigma.log()
+        return self._log_sigma
 
     @property
     def shape(self):
@@ -146,15 +152,15 @@ class Gaussian(Distribution):
 
     def view(self, shape):
         self.mu = self.mu.view(shape)
-        self.log_sigma = self.log_sigma.view(shape)
+        self._log_sigma = self._log_sigma.view(shape)
         self._sigma = self.sigma.view(shape)
         return self
 
     def __getitem__(self, item):
-        return Gaussian(self.mu[item], self.log_sigma[item])
+        return Gaussian(self.mu[item], self._log_sigma[item])
  
     def tensor(self):
-        return torch.cat([self.mu, self.log_sigma], dim=-1)
+        return torch.cat([self.mu, self._log_sigma], dim=-1)
     
 
 class UnitGaussian(Gaussian):
