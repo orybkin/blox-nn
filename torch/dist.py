@@ -116,6 +116,12 @@ class Gaussian(Distribution):
         # Negative log likelihood (probability)
         return 0.5 * torch.pow((x - self.mu) / self.sigma, 2) + self.log_sigma + 0.5 * np.log(2 * np.pi)
     
+    def optimal_variance_nll(self, x):
+        """ Computes the NLL of a gaussian with the optimal (constant) variance for these data """
+        
+        sigma = ((x - self.mu) ** 2).mean().sqrt()
+        return Gaussian(mu=self.mu, sigma=sigma).nll(x)
+    
     @property
     def sigma(self):
         if self._sigma is None:
@@ -161,6 +167,13 @@ class Gaussian(Distribution):
  
     def tensor(self):
         return torch.cat([self.mu, self._log_sigma], dim=-1)
+    
+
+class OptimalVarianceGaussian(Gaussian):
+    """ Technically not a distribution, however, it can compute NLL by adjusting it's variance to the datum at hand """
+    
+    def nll(self, x):
+        return self.optimal_variance_nll(x)
     
 
 class UnitGaussian(Gaussian):
