@@ -4,6 +4,10 @@ from blox.torch.dist import Gaussian
 from blox.tensor.ops import get_dim_inds
 
 
+class LossDict(AttrDict):
+    pass
+
+
 class Loss():
     def __init__(self, weight=1.0, breakdown=None):
         """
@@ -29,7 +33,7 @@ class Loss():
             value = error.sum(reduction).mean()
         else:
             raise NotImplementedError
-        loss = AttrDict(value=value, weight=self.weight)
+        loss = LossDict(value=value, weight=self.weight)
         
         if self.breakdown is not None:
             reduce_dim = get_dim_inds(error)[:self.breakdown] + get_dim_inds(error)[self.breakdown+1:]

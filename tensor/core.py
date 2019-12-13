@@ -35,7 +35,7 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False, ):
 
 
 def find(inp, success_fn):
-    """ Finds a single tensor in the structure """
+    """ Finds an element for which the success_fn responds true """
 
     def rec_find(structure):
         if isinstance(structure, list) or isinstance(structure, tuple):
@@ -59,6 +59,7 @@ def find(inp, success_fn):
 
 
 def find_tensor(structure, min_dim=None):
+    """ Finds a single tensor in the structure """
     def success_fn(x):
         success = isinstance(x, torch.Tensor)
         if min_dim is not None:
@@ -72,21 +73,22 @@ def find_tensor(structure, min_dim=None):
 find_element = lambda structure: find(structure, success_fn=lambda x: True)
 
 
-def make_recursive(fn, *argv, **kwargs):
+def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, **kwargs):
     """ Takes a fn and returns a function that can apply fn on tensor structure
      which can be a single tensor, tuple or a list. """
     
     def recursive_map(tensors):
-        if tensors is None:
+        if isinstance(tensors, target_class):
+            return fn(tensors, *argv, **kwargs)
+        elif tensors is None:
             return tensors
         elif isinstance(tensors, list) or isinstance(tensors, tuple):
             return type(tensors)(map(recursive_map, tensors))
         elif isinstance(tensors, dict):
             return type(tensors)(map_dict(recursive_map, tensors))
-        elif isinstance(tensors, torch.Tensor):
-            return fn(tensors, *argv, **kwargs)
         else:
             try:
+                assert not strict
                 return fn(tensors, *argv, **kwargs)
             except Exception as e:
                 print("The following error was raised when recursively applying a function:")
@@ -120,8 +122,8 @@ def make_recursive_list(fn):
     return recursive_map
 
 
-def map_recursive(fn, tensors):
-    return make_recursive(fn)(tensors)
+def map_recursive(fn, tensors, **kwargs):
+    return make_recursive(fn, **kwargs)(tensors)
 
 
 def map_recursive_list(fn, tensors):
