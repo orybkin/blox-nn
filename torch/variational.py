@@ -150,7 +150,7 @@ class CVAE(nn.Module, ProbabilisticModel):
     loss = vae.loss(inp, out)
     """
     
-    def __init__(self, hp, x_dim, cond_dim=0, generator=None, learn_beta=True, log_beta=0):
+    def __init__(self, hp, x_dim, cond_dim=0, generator=None):
         """
         
         :param hp: an object with attributes:
@@ -158,6 +158,8 @@ class CVAE(nn.Module, ProbabilisticModel):
             prior_type: can be ['learned', 'fixed']
             nz_vae: # of dim in the vae latent
             kl_weight: the weight on the KL-divergence loss (usually set to 1)
+            learn_sigma: whether the sigma of the decoder is learned
+            log_sigma: if the sigma is learned, this sets the initialization for it
         :param x_dim: the dimension of the data that are going to be modelled
         :param cond_dim: the dimension of the context
         :param generator (optional): a module that produces the x given the z and the context
@@ -173,7 +175,7 @@ class CVAE(nn.Module, ProbabilisticModel):
         self.gen = generator
         self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
         
-        self.log_sigma = get_constant_parameter(log_beta, learn_beta)
+        self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
         
         # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
         # self.prior = GaussianPredictor(hp, input_dim=cond_dim, gaussian_dim=hp.nz_vae)  # prior
