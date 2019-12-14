@@ -1,4 +1,5 @@
-from blox import AttrDict, rmap
+from blox import AttrDict, rmap, rmap_list
+from blox.torch import porch
 
 
 class Struct(AttrDict):
@@ -11,7 +12,13 @@ class Struct(AttrDict):
     
     # TODO use porch?
     def detach(self):
-        return rmap(lambda x: x.detach(), self)
+        return porch.detach(self)
     
     def __getitem__(self, *args, **kwargs):
         return rmap(lambda x: x.__getitem__(*args, **kwargs), self)
+    
+    def __setitem__(self, indices, values):
+        return rmap_list(lambda x, y: x.__setitem__(indices, y), [self, values])
+    
+    def clone(self):
+        return porch.clone(self)
