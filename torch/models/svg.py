@@ -28,6 +28,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
             nz_vae: # of dim in the vae latent
             builder: a LayerBuilderParams instance
             n_lstm_layers: number of layers in each LSTM network
+            nz_mid_lstm: LSTM hidden size
         :param x_size: the size of the modelled data
         :param context_size: the size of additional context that is fed every step
         :param reinit_size: the size of information used to initialize the lstm
@@ -35,20 +36,22 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         self._hp = hp
         BaseCell.__init__(self)
         ProbabilisticModel.__init__(self)
-        # inf_lstm outputs input_size + output_size because that's what inf expects, however, this is arbitrary
+        inf_inp_dim = x_size
+        prior_inp_dim = x_size
+        
         self.inf_lstm = InitLSTMCell(hp,
                                      input_size=x_size + context_size,
-                                     output_size=x_size + context_size,
+                                     output_size=inf_inp_dim,
                                      reset_input_size=reinit_size)
         self.gen_lstm = InitLSTMCell(hp,
                                      input_size=x_size + hp.nz_vae + context_size,  #pred_input_size,
                                      output_size=x_size,
                                      reset_input_size=reinit_size)
-        # inf expects input_size + context_size in, while prior expects context_size.
+        
         # TODO make a more expressive prior
-        self.inf, self.prior = setup_variational_inference(hp, x_size, context_size)
+        self.inf, self.prior = setup_variational_inference(hp, prior_inp_dim=prior_inp_dim, inf_inp_dim=inf_inp_dim)
     
-    def init_state(self, first_x, context, more_context=None):
+    def init_state(self, first_x, context=None, more_context=None):
         """ Initializes the state of the LSTM. Can be used to pass global context. Also performs the first step of
         inference LSTM"""
         if context is not None:
@@ -76,7 +79,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
             x_prime = torch.zeros_like(x)  # Used when sequence isn't available
         
         output.q_z = self.inf(self.inf_lstm(x_prime, context, more_context).output)
-        output.p_z = self.prior(x, x)  # the input is only used to read the batchsize atm
+        output.p_z = self.prior(x)  # the input is only used to read the batchsize atm
         
         if self._sample_prior:
             z = Gaussian(output.p_z).sample()
@@ -97,7 +100,18 @@ class VRNNCell(BaseCell, ProbabilisticModel):
 
 
 class VRNN(nn.Module):
-    """
+    """ Implements the variational RNN (Chung et al., 2015)
+    The variational RNN can be used to model sequences oh high-dimensional data. It is a sequential application
+    of deep Variational Bayes (Kingma'14, Rezende'14)
+
+    :param hp: an object with attributes:
+        var_inf: can be ['standard', 'deterministic']
+        prior_type: can be ['learned', 'fixed']
+        nz_vae: # of dim in the vae latent
+        builder: a LayerBuilderParams instance
+        n_lstm_layers: number of layers in each LSTM network
+        nz_mid_lstm: LSTM hidden size
+    :param x_dim: the number of dimensions of a data point
     """
     
     def __init__(self, hp, x_dim):
@@ -108,8 +122,16 @@ class VRNN(nn.Module):
         # TODO add global context
         # TODO add sequence context
         self.lstm = VRNNCell(hp, x_dim, 0, 0).make_lstm()
+        
+        self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
     
     def forward(self, x, length):
+        """
+        
+        :param x: the modelled sequence, batch x time x  x_dim
+        :param length: the desired length of the output sequence
+        :return:
+        """
         lstm_inputs = AttrDict(x_prime=x[:, 1:])
         initial_inputs = AttrDict(x=x[:, 0])
         
@@ -124,4 +146,3 @@ class VRNN(nn.Module):
             (model_output.q_z, model_output.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
         
         return losses
-    

@@ -4,7 +4,7 @@ from blox.basic_types import map_dict, listdict2dictlist
 import torch
 
 
-def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False, ):
+def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
     """ Applies the fn to the tensors while treating two first dimensions of tensors as batch.
 
     :param tensors: can be a single tensor, tuple or a list.

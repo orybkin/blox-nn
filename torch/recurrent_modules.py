@@ -223,8 +223,10 @@ class InitLSTMCell(CustomLSTMCell):
         super(InitLSTMCell, self).__init__(hp, input_size, output_size)
 
         self.reset_input_size = reset_input_size
-        self.init_module = BaseProcessingNet(reset_input_size, self._hp.nz_mid,
-                                             self.get_state_size(), 1, hp.builder, FCBlock)
+        
+        if reset_input_size != 0:
+            self.init_module = BaseProcessingNet(reset_input_size, self._hp.nz_mid,
+                                                 self.get_state_size(), 1, hp.builder, FCBlock)
     
     def init_state(self, init_input):
         init_input = init_input.view(init_input.shape[0], self.reset_input_size)
