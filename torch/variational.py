@@ -21,8 +21,8 @@ class GaussianPredictor(Predictor):
 
 
 class ApproximatePosterior(GaussianPredictor):
-    def __init__(self, hp, x_dim, cond_dim):
-        super().__init__(hp, x_dim + cond_dim)
+    def __init__(self, hp, inp_dim):
+        super().__init__(hp, inp_dim)
 
 
 class LearnedPrior(GaussianPredictor):
@@ -101,14 +101,14 @@ class AttentiveInference(nn.Module):
         return AttrDict(q_z=self.q.get_dummy())
 
 
-def get_prior(hp, cond_dim):
+def get_prior(hp, inp_dim):
     if hp.prior_type == 'learned':
-        return LearnedPrior(hp, cond_dim)
+        return LearnedPrior(hp, inp_dim)
     elif hp.prior_type == 'fixed':
         return FixedPrior(hp)
 
 
-def setup_variational_inference(hp, x_dim, cond_dim=0):
+def setup_variational_inference(hp, x_dim=None, cond_dim=0, prior_inp_dim=None, inf_inp_dim=None):
     """ Creates the inference and the prior networks
     
     :param hp: an object with attributes:
@@ -119,13 +119,16 @@ def setup_variational_inference(hp, x_dim, cond_dim=0):
     :param cond_dim:
     :return:
     """
+    prior_inp_dim = prior_inp_dim or cond_dim
+    inf_inp_dim = inf_inp_dim or cond_dim + x_dim
+    
     if hp.var_inf == '2layer':
         inf = VariationalInference2LayerSharedPQ(hp)
-        prior = TwolayerPriorSharedPQ(hp, get_prior(hp, cond_dim), inf.p_q_shared)
+        prior = TwolayerPriorSharedPQ(hp, get_prior(hp, prior_inp_dim), inf.p_q_shared)
 
     elif hp.var_inf == 'standard':
-        inf = ApproximatePosterior(hp, x_dim, cond_dim)
-        prior = get_prior(hp, cond_dim)
+        inf = ApproximatePosterior(hp, inf_inp_dim)
+        prior = get_prior(hp, prior_inp_dim)
 
     elif hp.var_inf == 'deterministic':
         inf = FixedPrior(hp)
