@@ -139,7 +139,7 @@ class CustomLSTMCell(BaseCell):
         # TODO use the LSTM class
         self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
         self.output = nn.Linear(hidden_size, output_size)
-        self.reset()
+        self.init_hidden()
         self.init_bias(self.lstm)
         
     @staticmethod
@@ -151,9 +151,15 @@ class CustomLSTMCell(BaseCell):
                 start, end = n // 4, n // 2
                 bias.data[start:end].fill_(1.)
 
+    def init_hidden(self):
+        # TODO Karl wrote some initializers that could be useful here
+        self.initial_hidden = nn.Parameter(torch.zeros(self._hp.batch_size, self.get_state_size()))
+        self.hidden = None
+
     def reset(self):
         # TODO make this trainable
-        self.hidden_var = torch.zeros(self._hp.batch_size, self.get_state_size(), device=self._hp.device)
+        # calling set_hidden_var is necessary here since direct assignment is intercepted by nn.Module
+        self.set_hidden_var(self.initial_hidden)
         
     def get_state_size(self):
         return self.hidden_size * self.n_layers * 2
@@ -180,6 +186,9 @@ class CustomLSTMCell(BaseCell):
         # TODO allow ConvLSTM
         if cell_kwinput:
             cell_input = cell_input + list(zip(*cell_kwinput.items()))[1]
+
+        if self.hidden is None:
+            self.reset()
         
         cell_input = concat_inputs(*cell_input)
         inp_extra_dim = list(cell_input.shape[2:])  # This keeps trailing dimensions (should be all shape 1)
@@ -193,10 +202,15 @@ class CustomLSTMCell(BaseCell):
     
     @property
     def hidden_var(self):
+        if self.hidden is None:
+            self.reset()
         return self.state2var(self.hidden)
     
     @hidden_var.setter
     def hidden_var(self, var):
+        self.set_hidden_var(var)
+    
+    def set_hidden_var(self, var):
         self.hidden = self.var2state(var)
 
 
