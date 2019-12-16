@@ -108,7 +108,7 @@ def get_prior(hp, cond_dim):
         return FixedPrior(hp)
 
 
-def setup_variational_inference(hp, x_dim, cond_dim):
+def setup_variational_inference(hp, x_dim, cond_dim=0):
     """ Creates the inference and the prior networks
     
     :param hp: an object with attributes:
@@ -176,9 +176,6 @@ class CVAE(nn.Module, ProbabilisticModel):
         self.inf, self.prior = setup_variational_inference(hp, x_dim, cond_dim)
         
         self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
-        
-        # self.inf = GaussianPredictor(hp, input_dim=x_dim + cond_dim, gaussian_dim=hp.nz_vae)  # inference
-        # self.prior = GaussianPredictor(hp, input_dim=cond_dim, gaussian_dim=hp.nz_vae)  # prior
         
     def forward(self, x, cond=None):
         output = AttrDict()
