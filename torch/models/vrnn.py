@@ -125,18 +125,18 @@ class VRNN(nn.Module):
         
         self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
     
-    def forward(self, x, length):
+    def forward(self, x, output_length, conditioning_length):
         """
         
         :param x: the modelled sequence, batch x time x  x_dim
-        :param length: the desired length of the output sequence
+        :param length: the desired length of the output sequence. Note, this includes all conditioning frames except 1
         :return:
         """
         lstm_inputs = AttrDict(x_prime=x[:, 1:])
-        initial_inputs = AttrDict(x=x[:, 0])
+        initial_inputs = AttrDict(x=x[:, :conditioning_length])
         
-        self.lstm.cell.init_state(initial_inputs.x)
-        outputs = self.lstm(inputs=lstm_inputs, initial_inputs=initial_inputs, length=length)
+        self.lstm.cell.init_state(x[:, 0])
+        outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs, length=output_length)
         return outputs
     
     def loss(self, inputs, model_output, log_error_arr=False):
