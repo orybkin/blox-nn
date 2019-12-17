@@ -1,6 +1,8 @@
 from blox import AttrDict, rmap, rmap_list
 from blox.torch import porch
 
+import torch
+
 
 class Struct(AttrDict):
     """ A struct is the base class for object-oriented programming in pytorch.
@@ -22,3 +24,9 @@ class Struct(AttrDict):
     
     def clone(self):
         return porch.clone(self)
+
+    def contiguous(self):
+        return rmap(lambda x: x.contiguous(), self)
+
+    # def __getattr__(self, item):
+    #     return getattr(porch, getattr(torch, item))(self)
