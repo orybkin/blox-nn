@@ -19,6 +19,11 @@ def map_dict(fn, d):
     return type(d)(map(lambda kv: (kv[0], fn(kv[1])), d.items()))
 
 
+def filter_dict(fn, d):
+    """takes a dictionary and applies the function to every element"""
+    return type(d)(filter(fn, d.items()))
+
+
 def listdict2dictlist(LD):
     """ Converts a list of dicts to a dict of lists """
     
