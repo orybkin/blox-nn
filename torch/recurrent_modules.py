@@ -3,7 +3,7 @@ import torch.nn as nn
 from blox.tensor.ops import concat_inputs
 from funcsigs import signature
 from blox import AttrDict
-from blox.basic_types import map_dict, listdict2dictlist, subdict
+from blox.basic_types import map_dict, listdict2dictlist, subdict, filter_dict
 from blox.torch.dist import stack
 from blox.torch.layers import BaseProcessingNet, FCBlock
 
@@ -17,12 +17,13 @@ class CustomLSTM(nn.Module):
         super(CustomLSTM, self).__init__()
         self.cell = cell
     
-    def forward(self, inputs, length, initial_inputs=None, static_inputs=None):
+    def forward(self, inputs, length, initial_inputs=None, static_inputs=None, initial_seq_inputs={}):
         """
         
         :param inputs: These are sliced by time. Time is the second dimension
         :param length: Rollout length
         :param initial_inputs: These are not sliced and are overridden by cell output
+        :param initial_seq_inputs: These can contain partial sequences. Cell output is used after these end.
         :param static_inputs: These are not sliced and can't be overridden by cell output
         :return:
         """
@@ -35,6 +36,8 @@ class CustomLSTM(nn.Module):
         lstm_outputs = []
         for t in range(length):
             step_inputs.update(map_dict(lambda x: x[:, t], inputs))  # Slicing
+            step_inputs.update(map_dict(lambda x: x[:, t],
+                                        filter_dict(lambda x: t < x[1].shape[1], initial_seq_inputs)))
             output = self.cell(**step_inputs)
             
             self.assert_post(output, inputs, initial_inputs, static_inputs)
