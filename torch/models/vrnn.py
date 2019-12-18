@@ -53,7 +53,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
     
     def init_state(self, first_x, context=None, more_context=None):
         """ Initializes the state of the LSTM. Can be used to pass global context. Also performs the first step of
-        inference LSTM"""
+        inference LSTM """
         if context is not None:
             self.inf_lstm.init_state(context)
             self.gen_lstm.init_state(context)

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from blox.tensor.ops import concat_inputs
 from funcsigs import signature
-from blox import AttrDict
+from blox import AttrDict, rmap_list
 from blox.basic_types import map_dict, listdict2dictlist, subdict, filter_dict
 from blox.torch.dist import stack
 from blox.torch.layers import BaseProcessingNet, FCBlock
@@ -46,9 +46,7 @@ class CustomLSTM(nn.Module):
             step_inputs.update(autoregressive_output)
             lstm_outputs.append(output)
         
-        # TODO recursively stack outputs
-        lstm_outputs = listdict2dictlist(lstm_outputs)
-        lstm_outputs = map_dict(lambda x: stack(x, dim=1), lstm_outputs)
+        lstm_outputs = rmap_list(lambda *x: stack(x, dim=1), lstm_outputs)
             
         self.cell.reset()
         return lstm_outputs
