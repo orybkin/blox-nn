@@ -58,9 +58,15 @@ class VRNNCell(BaseCell, ProbabilisticModel):
             self.inf_lstm.init_state(context)
             self.gen_lstm.init_state(context)
         
+        # TODO it would be extremely convenient to get rid of this by redefining the lstm to output one more frame
+        # the loss would normally not be placed on that frame, but if it was, it would be a zero-frames conditioned VRNN
+        # TODO the above needs to be done for an additional reason: currently the predictive model is not conditioned
+        # on the context of the first frame, only the inference model is conditioned on it
+        # (this is fine for action-conditioned prediction, where the first frame doesn't have context
+        
         # Note: this might be unnecessary since the first frame is already provided above
-        # TODO is there a way to get rid of this?
         if more_context is not None:
+            # TODO is there a way to get rid of this?
             more_context = more_context[:, 0]
         self.inf_lstm(first_x, context, more_context)
     
