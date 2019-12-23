@@ -154,13 +154,13 @@ class CustomLSTMCell(BaseCell):
 
     def init_hidden(self):
         # TODO Karl wrote some initializers that could be useful here
-        self.initial_hidden = nn.Parameter(torch.zeros(self._hp.batch_size, self.get_state_size()))
+        self.initial_hidden = nn.Parameter(torch.zeros(1, self.get_state_size()))
         self.hidden = None
 
     def reset(self):
         # TODO make this trainable
         # calling set_hidden_var is necessary here since direct assignment is intercepted by nn.Module
-        self.set_hidden_var(self.initial_hidden)
+        self.set_hidden_var(self.initial_hidden.repeat_interleave(self._hp.batch_size, 0))
         
     def get_state_size(self):
         return self.hidden_size * self.n_layers * 2
