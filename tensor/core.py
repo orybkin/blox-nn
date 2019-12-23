@@ -1,5 +1,3 @@
-from functools import partial
-
 from blox.basic_types import map_dict, listdict2dictlist
 import torch
 
@@ -73,9 +71,14 @@ def find_tensor(structure, min_dim=None):
 find_element = lambda structure: find(structure, success_fn=lambda x: True)
 
 
-def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, **kwargs):
+def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, only_target=False, **kwargs):
     """ Takes a fn and returns a function that can apply fn on tensor structure
-     which can be a single tensor, tuple or a list. """
+     which can be a single tensor, tuple or a list.
+     
+    When run with strict=True, the function fails if there are classes other than target_class
+    When run with only_target=True, classes other than target_class are ignored
+    When strict=False and only_target=False, the function will try to apply fn to every element
+    """
     
     def recursive_map(tensors):
         if isinstance(tensors, target_class):
@@ -87,6 +90,10 @@ def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, **kwargs)
         elif isinstance(tensors, dict):
             return type(tensors)(map_dict(recursive_map, tensors))
         else:
+            # Misc elements - neither collections nor targets
+            if only_target:
+                return tensors
+                
             try:
                 assert not strict
                 return fn(tensors, *argv, **kwargs)
@@ -130,6 +137,7 @@ def map_recursive_list(fn, tensors):
     return make_recursive_list(fn)(tensors)
 
 
+# TODO make rmap the main implementation
 rmap = map_recursive
 rmap_list = map_recursive_list
 recursively = make_recursive
