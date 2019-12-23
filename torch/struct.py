@@ -2,6 +2,7 @@ from blox import AttrDict, rmap, rmap_list
 from blox.torch import porch
 
 import torch
+import os
 
 
 class Struct(AttrDict):
@@ -11,6 +12,8 @@ class Struct(AttrDict):
     # TODO should this inherit from AttrDict?
     # TODO: make a way for such classes to include a custom init function (and still work with rmap)
     # TODO a simplest way of doing that seems to be to support a to_dict and from_dict function in rmap.
+    
+    # TODO: make this unpicklable (currently impossible because of inheritance from dict overriden __setitem__
     
     # TODO use porch?
     def detach(self):
@@ -30,3 +33,10 @@ class Struct(AttrDict):
 
     # def __getattr__(self, item):
     #     return getattr(porch, getattr(torch, item))(self)
+
+
+def save(struct, path):
+    # TODO remove this once you can save structures with torch.save
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    save_inputs = rmap(AttrDict, struct, target_class=Struct, only_target=True)
+    torch.save(save_inputs, path)
