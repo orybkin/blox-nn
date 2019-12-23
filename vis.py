@@ -46,12 +46,16 @@ def npy_to_gif(im_list, filename, fps=5):
 def npy_to_mp4(im_list, filename, fps=4):
     save_dir = '/'.join(str.split(filename, '/')[:-1])
 
-    if not os.path.exists(save_dir):
+    if save_dir and not os.path.exists(save_dir):
         print('creating directory: ', save_dir)
         os.mkdir(save_dir)
 
     clip = mpy.ImageSequenceClip(im_list, fps=fps)
     clip.write_videofile(filename + '.mp4')
+    
+
+npy2gif = npy_to_gif
+npy2mp4 = npy_to_mp4
 
 
 def ch_first2last(video):
