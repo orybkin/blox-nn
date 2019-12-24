@@ -15,6 +15,8 @@ class Struct(AttrDict):
     
     # TODO: make this unpicklable (currently impossible because of inheritance from dict overriden __setitem__
     
+    # TODO what is the proper way to query the dict by name (as a variable)? Having an internal dict variable seems good
+    
     # TODO use porch?
     def detach(self):
         return porch.detach(self)
@@ -31,9 +33,30 @@ class Struct(AttrDict):
     def contiguous(self):
         return rmap(lambda x: x.contiguous(), self)
 
+    @property
+    def dict(self):
+        """
+        A property that can be used to access attributes by square brackets. E.g.:
+        
+        s = Struct(a=torch.zeros(10))
+        s.dict['a'] == torch.zeros(10)
+        """
+        return DictAccess(self)
+
     # def __getattr__(self, item):
     #     return getattr(porch, getattr(torch, item))(self)
 
+
+class DictAccess():
+    # A simple access class that forwards item calls to struct's attributes
+    def __init__(self, struct):
+        super().__setattr__('struct', struct)
+
+    def __getitem__(self, item):
+        return dict.__getitem__(self.struct, item)
+
+    def __setitem__(self, key, value):
+        return dict.__setitem__(self.struct, key, value)
 
 def save(struct, path):
     # TODO remove this once you can save structures with torch.save
