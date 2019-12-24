@@ -4,6 +4,8 @@ from torch.nn.parallel._functions import Gather
 from torch.optim import __init__ as optim
 from torch.utils.data import DataLoader
 from torch.utils.data import Sampler
+import torch.utils.data as torchd
+from functools import partial
 
 
 class LossSpikeHook:
@@ -57,6 +59,20 @@ class RepeatedSampler(Sampler):
 
     def __len__(self):
         return len(self._sampler) * self.n_repeat
+
+
+class DataLoader(torchd.DataLoader):
+    def __init__(self, *args, **kwargs):
+        # Inititalize the workers with different random seeds. If this is not done, the numpy random seed will be the
+        # same for all workers, which can cause less randomness than one hoped for
+        
+        # The random seed of the global process controls the workers' seeds: the whole process is reproducible
+        
+        kwargs['worker_init_fn'] = lambda x: np.random.seed(np.random.randint(65536) + x)
+        super().__init__(*args, **kwargs)
+        
+# Alternative implementation:
+# DataLoader = partial(torchd.DataLoader, worker_init_fn=lambda x: np.random.seed(np.random.randint(65536) + x))
 
 
 class DataParallelWrapper(torch.nn.DataParallel):
