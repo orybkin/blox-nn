@@ -59,9 +59,11 @@ def tensor2indices(tensor, dim):
 
 
 def batch_cdist(x1, x2, reduction='sum'):
-    """ Compute batchwise L2 matrix using quadratic expansion. For each of n vectors in x1, compute L2 norm between it
+    """ Compute batchwise L2 norm matrix: for each of n vectors in x1, compute L2 norm between it
     and each of m vectors in x2 and outputs the corresponding matrix.
-    Adapted from a suggestion somewhere online (look for pytorch github issue comments on cdist).
+    This is a memory-efficient version using quadratic expansion, adapted from a suggestion somewhere online
+    (look for pytorch github issue comments on cdist). It does not require duplicating the arrays, and only scales
+    with max(n,m) as opposed to n x m memory size.
     
     :param x1: a tensor of shape batchsize x n x dim
     :param x2: a tensor of shape batchsize x m x dim
