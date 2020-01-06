@@ -52,6 +52,8 @@ def npy_to_gif(im_list, filename, fps=5):
 def npy_to_mp4(im_list, filename, fps=4):
     if isinstance(im_list, np.ndarray):
         im_list = list(im_list)
+    if filename[-4:] != '.mp4':
+        filename = filename + '.mp4'
         
     save_dir = '/'.join(str.split(filename, '/')[:-1])
 
@@ -60,7 +62,7 @@ def npy_to_mp4(im_list, filename, fps=4):
         os.mkdir(save_dir)
 
     clip = mpy.ImageSequenceClip(im_list, fps=fps)
-    clip.write_videofile(filename + '.mp4')
+    clip.write_videofile(filename)
     
 
 npy2gif = npy_to_gif
