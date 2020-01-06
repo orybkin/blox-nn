@@ -4,7 +4,6 @@ from torchvision.transforms import Resize
 import os
 import moviepy.editor as mpy
 
-
 def read_gif(im, resize=None, transpose=True):
     if isinstance(im, str):
         im = Image.open(im)
@@ -30,6 +29,13 @@ def read_gif(im, resize=None, transpose=True):
 
 
 def npy_to_gif(im_list, filename, fps=5):
+    """
+    
+    :param im_list: a list of frames
+    :param filename:
+    :param fps:
+    :return:
+    """
     save_dir = '/'.join(str.split(filename, '/')[:-1])
 
     if not os.path.exists(save_dir):
@@ -44,6 +50,9 @@ def npy_to_gif(im_list, filename, fps=5):
 
 
 def npy_to_mp4(im_list, filename, fps=4):
+    if isinstance(im_list, np.ndarray):
+        im_list = list(im_list)
+        
     save_dir = '/'.join(str.split(filename, '/')[:-1])
 
     if save_dir and not os.path.exists(save_dir):
