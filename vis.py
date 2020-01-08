@@ -36,17 +36,19 @@ def npy_to_gif(im_list, filename, fps=5):
     :param fps:
     :return:
     """
+    if isinstance(im_list, np.ndarray):
+        im_list = list(im_list)
+    if filename[-4:] != '.gif':
+        filename = filename + '.gif'
+        
     save_dir = '/'.join(str.split(filename, '/')[:-1])
 
     if not os.path.exists(save_dir):
         print('creating directory: ', save_dir)
         os.makedirs(save_dir)
 
-    if isinstance(im_list, np.ndarray):
-        im_list = list(im_list)
-
     clip = mpy.ImageSequenceClip(im_list, fps=fps)
-    clip.write_gif(filename + '.gif')
+    clip.write_gif(filename)
 
 
 def npy_to_mp4(im_list, filename, fps=4):
