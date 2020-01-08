@@ -155,6 +155,7 @@ def slice_tensor(tensor, start, step, dim):
     
 
 def pad_to(tensor, size, dim=-1, mode='back'):
+    # TODO: padding to the back somehow pads to the beginning
     kwargs = dict()
     
     padding = size - tensor.shape[dim]
@@ -171,12 +172,12 @@ def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1):
     l = len(generalized_tensor.shape)
     if dim < 0:
         dim = l + dim
-        
-    size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
-    # pad takes element in reversed order for some reason
-    
+  
     if isinstance(generalized_tensor, torch.Tensor):
-        return F.pad(generalized_tensor, list(reversed(size)))
+        # pad takes dimensions in reversed order for some reason
+        size = (l - dim - 1) * 2 * [0] + [pad_front, pad_back] + (dim) * 2 * [0]
+        return F.pad(generalized_tensor, size)
     elif isinstance(generalized_tensor, np.ndarray):
+        size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
         size = list(zip(size[::2], size[1::2]))
         return np.pad(generalized_tensor, size, mode='constant')
