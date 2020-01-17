@@ -70,13 +70,14 @@ class VRNNCell(BaseCell, ProbabilisticModel):
             more_context = more_context[:, 0]
         self.inf_lstm(first_x, context, more_context)
     
-    def forward(self, x, context=None, x_prime=None, more_context=None):
+    def forward(self, x, context=None, x_prime=None, more_context=None, z=None):
         """
         
         :param x: observation at current step
         :param context: to be fed at each timestep
         :param x_prime: observation at next step
         :param more_context: also to be fed at each timestep.
+        :param z: (optional) if not None z is used directly and not sampled
         :return:
         """
         # TODO to get rid of more_context, make an interface that allows context structures
@@ -86,8 +87,10 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         
         output.q_z = self.inf(self.inf_lstm(x_prime, context, more_context).output)
         output.p_z = self.prior(x)  # the input is only used to read the batchsize atm
-        
-        if self._sample_prior:
+
+        if z is not None:
+            pass        # use z directly
+        elif self._sample_prior:
             z = Gaussian(output.p_z).sample()
         else:
             z = Gaussian(output.q_z).sample()
