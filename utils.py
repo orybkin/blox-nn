@@ -4,6 +4,7 @@ import time
 from contextlib import contextmanager
 
 from blox.tensor.core import map_recursive, map_recursive_list
+from blox import AttrDict
 
 
 class AverageMeter(object):
@@ -132,3 +133,11 @@ class HasParameters:
             self.params.update(inputs)
     
     # TODO allow to access parameters by self.<param>
+
+
+class ParamDict(AttrDict):
+    def overwrite(self, new_params):
+        for param in new_params:
+            print('overriding param {} to value {}'.format(param, new_params[param]))
+            self.__setattr__(param, new_params[param])
+        return self
