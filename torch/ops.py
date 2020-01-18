@@ -152,6 +152,14 @@ def slice_tensor(tensor, start, step, dim):
         return tensor[:, start::step]
     else:
         raise NotImplementedError
+
+
+def reduce_dim(tensor, dim):
+    """Folds dimension dim into previous dimension."""
+    if dim == 0: return tensor
+    assert len(tensor.shape) > dim      # dim is too high for tensor dimensionality
+    shape = list(tensor.shape)
+    return tensor.view(shape[:dim-1] + [-1] + shape[dim+1:])
     
 
 def pad_to(tensor, size, dim=-1, mode='back'):
