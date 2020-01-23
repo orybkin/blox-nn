@@ -110,7 +110,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
 
 class VRNN(nn.Module):
     """ Implements the variational RNN (Chung et al., 2015)
-    The variational RNN can be used to model sequences oh high-dimensional data. It is a sequential application
+    The variational RNN can be used to model sequences of high-dimensional data. It is a sequential application
     of deep Variational Bayes (Kingma'14, Rezende'14)
 
     :param hp: an object with attributes:
@@ -123,28 +123,34 @@ class VRNN(nn.Module):
     :param x_dim: the number of dimensions of a data point
     """
     
-    def __init__(self, hp, x_dim):
+    def __init__(self, hp, x_dim, context_dim=0):
         # TODO make test time version
         super().__init__()
         self._hp = hp
         
         # TODO add global context
         # TODO add sequence context
-        self.lstm = VRNNCell(hp, x_dim, 0, 0).make_lstm()
+        self.lstm = VRNNCell(hp, x_dim, context_dim, 0).make_lstm()
         
         self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
     
-    def forward(self, x, output_length, conditioning_length):
+    def forward(self, x, output_length, conditioning_length, context=None):
         """
         
         :param x: the modelled sequence, batch x time x  x_dim
         :param length: the desired length of the output sequence. Note, this includes all conditioning frames except 1
+        :param conditioning_length: the length on which the prediction will be conditioned. Ground truth data are observed
+        for this length
+        :param context: a context sequence. Prediction is conditioned on all context up to and including this moment
         :return:
         """
         lstm_inputs = AttrDict(x_prime=x[:, 1:])
+        if context is not None:
+            lstm_inputs.update(more_context=context[:, 1:])
+            
         initial_inputs = AttrDict(x=x[:, :conditioning_length])
         
-        self.lstm.cell.init_state(x[:, 0])
+        self.lstm.cell.init_state(x[:, 0], more_context=context)
         outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs, length=output_length)
         return outputs
     
