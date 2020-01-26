@@ -196,8 +196,8 @@ def num_parameters(model, level=0):
     :return:
     """
     
-    if level == 0:
+    if level == 0 or len(model.named_children()) == 0:
         return sum([p.numel() for p in model.parameters()])
-    elif level == 1:
-        return map_dict(num_parameters, dict(model.named_children()))
+    else:
+        return map_dict(lambda x: num_parameters(x, level - 1), dict(model.named_children()))
 
