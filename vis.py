@@ -3,6 +3,7 @@ from PIL import Image
 from torchvision.transforms import Resize
 import os
 import moviepy.editor as mpy
+from moviepy.audio.AudioClip import AudioArrayClip
 
 def read_gif(im, resize=None, transpose=True):
     if isinstance(im, str):
@@ -51,7 +52,15 @@ def npy_to_gif(im_list, filename, fps=5):
     clip.write_gif(filename)
 
 
-def npy_to_mp4(im_list, filename, fps=4):
+def npy_to_mp4(im_list, filename, fps=4, audio=None):
+    """
+    
+    :param im_list:
+    :param filename:
+    :param fps:
+    :param audio: an array frames x samples, containing the audio samples per each frame
+    :return:
+    """
     if isinstance(im_list, np.ndarray):
         im_list = list(im_list)
     if filename[-4:] != '.mp4':
@@ -64,8 +73,21 @@ def npy_to_mp4(im_list, filename, fps=4):
         os.mkdir(save_dir)
 
     clip = mpy.ImageSequenceClip(im_list, fps=fps)
-    clip.write_videofile(filename)
     
+    if audio is not None:
+        # moviepy always expects stereo audio for some reason, repeating second axis to emulate stereo.
+        samples_per_frame = audio.shape[1]
+        audio = audio.reshape(-1, 1).repeat(2, 1)
+            
+        audio_clip = AudioArrayClip(audio, fps=samples_per_frame * fps)
+        clip = clip.set_audio(audio_clip)
+    
+    clip.write_videofile(filename, temp_audiofile=filename + '.m4a', remove_temp=True, codec="libx264", audio_codec="aac")
+
+
+# audio = AudioArrayClip(np.ones((20 * 1067, 1)), fps=fps * 1067)
+# clip = clip.set_audio(audio.subclip(0, clip.duration))
+# clip.write_videofile(filename, temp_audiofile=filename + '.m4a', remove_temp=True, codec="libx264",audio_codec="aac")
 
 npy2gif = npy_to_gif
 npy2mp4 = npy_to_mp4
