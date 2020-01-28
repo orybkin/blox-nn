@@ -532,8 +532,8 @@ class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     def build_network(self):
         super().build_network()
         split_state_size = int(self.get_state_size() / (self._hp.n_lstm_layers*2))
-        self.projections = [nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
-                            for _ in range(self._hp.n_lstm_layers*2)]
+        self.projections = torch.nn.ModuleList([nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
+                            for _ in range(self._hp.n_lstm_layers*2)])
 
     def forward(self, hidden1, hidden2, *inputs):
         chunked_hidden1 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, -1)]))
