@@ -1,6 +1,8 @@
 import math
 from functools import partial
 from typing import List, Tuple
+from itertools import chain
+
 
 import numpy as np
 import torch
@@ -522,6 +524,23 @@ class LinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
 
     def forward(self, hidden1, hidden2, *inputs):
         hidden_state = self.projection(concat_inputs(hidden1, hidden2))
+        return super().forward(hidden_state, *inputs)
+
+
+class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
+    """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
+    def build_network(self):
+        super().build_network()
+        split_state_size = int(self.get_state_size() / (self._hp.n_lstm_layers*2))
+        self.projections = [nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
+                            for _ in range(self._hp.n_lstm_layers*2)]
+
+    def forward(self, hidden1, hidden2, *inputs):
+        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, -1)]))
+        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, -1)]))
+        chunked_projected = [projection(concat_inputs(h1, h2))
+                             for projection, h1, h2 in zip(self.projections, chunked_hidden1, chunked_hidden2)]
+        hidden_state = torch.cat(chunked_projected, dim=-1)
         return super().forward(hidden_state, *inputs)
 
 
