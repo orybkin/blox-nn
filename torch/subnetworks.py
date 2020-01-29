@@ -110,7 +110,7 @@ class Decoder(nn.Module):
             self.act_log_sigma = get_constant_parameter(0, hp.learn_beta)
             self.act_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
             
-        self.log_sigma = get_constant_parameter(np.log(self._hp.kl_weight), hp.learn_beta)
+        self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
         self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
         
     def forward(self, input, **kwargs):
