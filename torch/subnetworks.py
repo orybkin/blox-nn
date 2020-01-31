@@ -295,30 +295,21 @@ class Attention(nn.Module):
                                                for _ in range(hp.n_attention_layers)])
         self.out = nn.Linear(hp.nz_enc, hp.nz_enc)
 
-    def forward(self, enc_demo_seq, enc_demo_key_seq, e_l, e_r, start_ind, end_ind, inputs, timestep=None):
+    def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None):
         """Performs multi-layered, multi-headed attention."""
-
-        if self._hp.forced_attention:
-            return batchwise_index(enc_demo_seq, timestep[:,0].long()), None
-
-        # Get (initial) attention key
-        if self._hp.one_hot_attn_time_cond and timestep is not None:
-            one_hot_timestep = make_one_hot(timestep.long(), self._hp.max_seq_len).float()
-        else:
-            one_hot_timestep = timestep
-        args = [one_hot_timestep] if self._hp.timestep_cond_attention else []
-        
-        query = self.query_net(e_l, e_r, *args)
+        if timestep is not None:
+            return batchwise_index(values, timestep[:,0].long()), None
+            
+        query = self.query_net(*query_input)
         
         # Attend
         s_ind, e_ind = (torch.floor(start_ind), torch.ceil(end_ind)) if self._hp.mask_inf_attention \
                                                                      else (inputs.start_ind, inputs.end_ind)
         norm_shape_k = query.shape[1:]
-        norm_shape_v = enc_demo_seq.shape[2:]
+        norm_shape_v = values.shape[2:]
         raw_attn_output, att_weights = None, None
         for attention, predictor in zip(self.attention_layers, self.predictor_layers):
-            raw_attn_output, att_weights = attention(query, enc_demo_key_seq, enc_demo_seq, s_ind, e_ind,
-                                                     forced_attention_step=timestep if self._hp.forced_attention else None)
+            raw_attn_output, att_weights = attention(query, keys, values, s_ind, e_ind)
             x = F.layer_norm(raw_attn_output, norm_shape_v)
             query = F.layer_norm(predictor(x) + query, norm_shape_k)  # skip connections around attention and predictor
 
@@ -427,9 +418,8 @@ class ConvSeqEncodingModule(SeqEncodingModule):
         kernel_size = hp.conv_inf_enc_kernel_size
         assert kernel_size % 2 != 0     # need uneven kernel size for padding
         padding = int(np.floor(kernel_size / 2))
-        n_layers = hp.conv_inf_enc_layers
         block = partial(ConvBlock, d=1, kernel_size=kernel_size, padding=padding)
-        self.net = BaseProcessingNet(input_size, hp.nz_mid, hp.nz_enc, n_layers, hp.builder, block=block)
+        self.net = BaseProcessingNet(input_size, hp.nz_mid, hp.nz_enc, hp.conv_inf_enc_layers, hp.builder, block=block)
         
     def run_net(self, seq):
         # 1d convolutions expect length-last

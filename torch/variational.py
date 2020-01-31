@@ -3,6 +3,7 @@ from blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ,
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
 from blox.torch.dist import get_constant_parameter
+from blox.torch.ops import batchwise_index, make_one_hot
 
 import torch.nn as nn
 import torch
@@ -84,8 +85,20 @@ class AttentiveInference(nn.Module):
             output.q_z = self.q(e_l)
             return output
         
-        e_tilde, output.gamma = self.attention(inputs.inf_enc_seq, inputs.inf_enc_key_seq, e_l, e_r,
-                                               start_ind, end_ind, inputs, timestep)
+        values = inputs.inf_enc_seq
+        keys = inputs.inf_enc_key_seq
+        
+        # Get (initial) attention key
+        query_input = [e_l, e_r]
+        if self._hp.timestep_cond_attention:
+            if self._hp.one_hot_attn_time_cond and timestep is not None:
+                one_hot_timestep = make_one_hot(timestep.long(), self._hp.max_seq_len).float()
+            else:
+                one_hot_timestep = timestep
+            query_input = query_input.append(one_hot_timestep)
+        
+        forced_timestep = timestep if self._hp.forced_attention else None
+        e_tilde, output.gamma = self.attention(values, keys, query_input, start_ind, end_ind, inputs, forced_timestep)
         output.q_z = self.q(e_l, e_r, e_tilde)
         return output
     
