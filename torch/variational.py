@@ -76,7 +76,7 @@ class AttentiveInference(nn.Module):
         self.attention = attention
         self.deterministic = isinstance(self.q, FixedPrior)
 
-    def forward(self, inputs, e_l, e_r, start_ind, end_ind, timestep=None, force_timestep=True):
+    def forward(self, inputs, e_l, e_r, start_ind, end_ind, timestep=None, attention_weights=None):
         if not self.run:
             return self.get_dummy(e_l)
         
@@ -96,9 +96,10 @@ class AttentiveInference(nn.Module):
             else:
                 one_hot_timestep = timestep
             query_input = query_input.append(one_hot_timestep)
+        forced_timestep = timestep if self._hp.forced_attention else None
         
-        forced_timestep = timestep if force_timestep else None
-        e_tilde, output.gamma = self.attention(values, keys, query_input, start_ind, end_ind, inputs, forced_timestep)
+        e_tilde, output.gamma = self.attention(values, keys, query_input, start_ind, end_ind, inputs, forced_timestep,
+                                               attention_weights)
         output.q_z = self.q(e_l, e_r, e_tilde)
         return output
     

@@ -295,7 +295,7 @@ class Attention(nn.Module):
                                                for _ in range(hp.n_attention_layers)])
         self.out = nn.Linear(hp.nz_enc, hp.nz_enc)
 
-    def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None):
+    def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None, attention_weights=None):
         """Performs multi-layered, multi-headed attention."""
         if timestep is not None:
             return batchwise_index(values, timestep[:,0].long()), None
@@ -309,7 +309,7 @@ class Attention(nn.Module):
         norm_shape_v = values.shape[2:]
         raw_attn_output, att_weights = None, None
         for attention, predictor in zip(self.attention_layers, self.predictor_layers):
-            raw_attn_output, att_weights = attention(query, keys, values, s_ind, e_ind)
+            raw_attn_output, att_weights = attention(query, keys, values, s_ind, e_ind, attention_weights=attention_weights)
             x = F.layer_norm(raw_attn_output, norm_shape_v)
             query = F.layer_norm(predictor(x) + query, norm_shape_k)  # skip connections around attention and predictor
 
@@ -337,7 +337,7 @@ class MultiheadAttention(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.out = nn.Linear(self.nz, self.nz)
 
-    def forward(self, q, k, v, start_ind, end_ind, forced_attention_step=None):
+    def forward(self, q, k, v, start_ind, end_ind, forced_attention_step=None, attention_weights=None):
         batch_size, time = list(k.shape)[:2]
         latent_shape = list(v.shape[2:])
 
@@ -347,31 +347,35 @@ class MultiheadAttention(nn.Module):
         v = apply_linear(self.v_linear, v, dim=2).view(batch_size, time, self.n_heads, self.nz_v_i, *latent_shape[1:])
 
         # compute masked, multi-headed attention
-        vals, att_weights = self.attention(q, k, v, self.nz_k_i, start_ind, end_ind, self.dropout, forced_attention_step)
+        vals, att_weights = self.attention(q, k, v, self.nz_k_i, start_ind, end_ind, self.dropout, forced_attention_step,
+                                           attention_weights)
 
         # concatenate heads and put through final linear layer
         concat = vals.contiguous().view(batch_size, *latent_shape)
         return apply_linear(self.out, concat, dim=1), att_weights.mean(dim=-1)
 
-    def attention(self, q, k, v, nz_k, start_ind, end_ind, dropout=None, forced_attention_step=None):
+    def attention(self, q, k, v, nz_k, start_ind, end_ind, dropout=None, forced_attention_step=None,
+                  attention_weights=None):
 
         def tensor_product(key, sequence):
             dims = list(range(len(list(sequence.shape)))[3:])
             return (key[:, None] * sequence).sum(dim=dims)
 
-        attn_scores = tensor_product(q, k) / math.sqrt(nz_k) * self.temperature
-        attn_scores = MultiheadAttention.mask_out(attn_scores, start_ind, end_ind)
-        attn_scores = F.softmax(attn_scores, dim=1)
+        scores = tensor_product(q, k) / math.sqrt(nz_k) * self.temperature
+        scores = MultiheadAttention.mask_out(scores, start_ind, end_ind)
+        scores = F.softmax(scores, dim=1)
 
         if forced_attention_step is not None:
-            scores_f = torch.zeros_like(attn_scores)
-            batchwise_assign(scores_f, forced_attention_step[:, 0].long(), 1.0)
+            scores = torch.zeros_like(scores)
+            batchwise_assign(scores, forced_attention_step[:, 0].long(), 1.0)
 
-        scores = scores_f if forced_attention_step is not None else attn_scores
+        if attention_weights is not None:
+            scores = attention_weights[..., None].repeat_interleave(scores.shape[2], 2)
+
         if dropout is not None and dropout.p > 0.0:
             scores = dropout(scores)
 
-        return (broadcast_final(scores, v) * v).sum(dim=1), attn_scores
+        return (broadcast_final(scores, v) * v).sum(dim=1), scores
 
     @staticmethod
     def mask_out(scores, start_ind, end_ind):
