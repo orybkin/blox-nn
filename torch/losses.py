@@ -67,6 +67,10 @@ class KLDivLoss(Loss):
 class CELoss(Loss):
     compute = staticmethod(torch.nn.functional.cross_entropy)
     
+    
+class BCELogitsLoss(Loss):
+    compute = staticmethod(torch.nn.functional.binary_cross_entropy_with_logits)
+
 
 class NLL(Loss):
     # Note that cross entropy is an instance of NLL, as is L2 loss.
