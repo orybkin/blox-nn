@@ -142,12 +142,11 @@ class LinearUpdater(Updater):
         self.n_iter = n_iter
         self.target = target
         self.name = name
-        
-        self.upd = self.determine_upd(n_iter, update_freq, target, parameter.data[0])
     
-    def determine_upd(self, n_iter, update_freq, target, current):
-        n_updates = n_iter / update_freq
-        upd = (target - current) / n_updates
+    @property
+    def upd(self):
+        n_updates = (self.n_iter - self.it) / self.update_freq
+        upd = (self.target - self.parameter.data[0]) / n_updates
         
         return upd
 
