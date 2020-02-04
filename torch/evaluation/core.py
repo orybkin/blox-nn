@@ -20,6 +20,9 @@ class metric:
         :param per_datum: If this is True, return a tensor of shape: [batch_size], otherwise: [1]
         :return:
         """
+        if targets.size == 0:
+            return 0
+        
         error = self.func(estimates, targets)
         if per_datum:
             return np.mean(error, axis=get_dim_inds(error)[1:])
