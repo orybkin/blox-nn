@@ -201,7 +201,7 @@ def get_num_conv_layers(img_sz):
     return int(n)
 
 
-class LayerBuilderParams:
+class LayerBuilderParams(dict):
     """ This class holds general parameters for all subnetworks, such as whether to use convolutional networks, etc """
     
     def __init__(self, use_convs, normalize=True, normalization='batch', predictor_normalization=None):
