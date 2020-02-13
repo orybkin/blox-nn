@@ -65,6 +65,11 @@ class Ndim():
     @adapter(torch.clone, np.copy)
     def copy(*args, **kwargs):
         pass
+
+    @staticmethod
+    @adapter(torch.cat, np.concatenate)
+    def cat(*args, **kwargs):
+        pass
     
     @staticmethod
     @adapter(torch.Tensor.type, np.ndarray.astype)
