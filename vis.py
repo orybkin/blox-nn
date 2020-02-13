@@ -76,7 +76,11 @@ def npy_to_mp4(im_list, filename, fps=4, audio=None):
     
     if audio is not None:
         # moviepy always expects stereo audio for some reason, repeating second axis to emulate stereo.
-        samples_per_frame = audio.shape[1]
+        if len(audio.shape) == 2:
+            samples_per_frame = audio.shape[1]
+        else:
+            samples_per_frame = audio.shape[0] / len(im_list)
+            
         audio = audio.reshape(-1, 1).repeat(2, 1)
             
         audio_clip = AudioArrayClip(audio, fps=samples_per_frame * fps)
