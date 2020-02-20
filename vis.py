@@ -4,6 +4,10 @@ from torchvision.transforms import Resize
 import os
 import moviepy.editor as mpy
 from moviepy.audio.AudioClip import AudioArrayClip
+import tempfile
+from subprocess import call
+from scipy.io import wavfile
+
 
 def read_gif(im, resize=None, transpose=True):
     if isinstance(im, str):
@@ -86,15 +90,43 @@ def npy_to_mp4(im_list, filename, fps=4, audio=None):
         audio_clip = AudioArrayClip(audio, fps=samples_per_frame * fps)
         clip = clip.set_audio(audio_clip)
     
-    clip.write_videofile(filename, temp_audiofile=filename + '.m4a', remove_temp=True, codec="libx264", audio_codec="aac")
+    clip.write_videofile(filename, temp_audiofile=filename + '.m4a', remove_temp=True, codec="libx264", audio_codec="aac",
+                         verbose=False, logger=None)
 
 
+def npy_to_mp4_w_audio(im_list, filename, fps=4, audio=None):
+    """ This function save npy with audio using a direct call to ffmpeg. I found this necessary to work for a particular
+    set of audio and video. The standard npy_to_mp4 works for some other set of audio and video, potentially not a subset.
+    I am not an expert in codecs ¯\_(ツ)_/¯ """
+    if filename[-4:] != '.mp4':\
+        filename = filename + '.mp4'
+        
+    if audio is not None:
+        if len(audio.shape) == 2:
+            samples_per_frame = audio.shape[1]
+        else:
+            samples_per_frame = audio.shape[0] / len(im_list)
+
+        audio = audio.reshape(-1, 1).repeat(2, 1)
+            
+        tmp_audio_file = tempfile.NamedTemporaryFile('w', suffix='.wav', dir='.')
+        tmp_video_file = tempfile.NamedTemporaryFile('w', suffix='.mp4', dir='.')
+        wavfile.write(tmp_audio_file.name, int(samples_per_frame * fps), audio[:, 0])
+        npy_to_mp4(im_list, tmp_video_file.name, fps)
+
+        cmd = ('ffmpeg' + ' -i {0} -i {1} -vcodec h264 -ac 2 -channel_layout stereo -pix_fmt yuv420p {2} -y -loglevel 16'.format(tmp_audio_file.name, tmp_video_file.name, filename)).split()
+        call(cmd)
+    else:
+        npy_to_mp4(im_list, filename, fps)
+    
+    print('saved a video to ' + filename)
 # audio = AudioArrayClip(np.ones((20 * 1067, 1)), fps=fps * 1067)
 # clip = clip.set_audio(audio.subclip(0, clip.duration))
 # clip.write_videofile(filename, temp_audiofile=filename + '.m4a', remove_temp=True, codec="libx264",audio_codec="aac")
 
+
 npy2gif = npy_to_gif
-npy2mp4 = npy_to_mp4
+npy2mp4 = npy_to_mp4_w_audio
 
 
 def ch_first2last(video):
