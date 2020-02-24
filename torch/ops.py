@@ -105,6 +105,9 @@ def list2ten(list, device=None, dtype=None):
 
 
 def dim2list(tensor, dim):
+    if tensor.shape[dim] == 0:
+        return []
+        
     return [t.squeeze(dim) for t in torch.split(tensor, 1, dim)]
 
 
