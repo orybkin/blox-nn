@@ -29,7 +29,7 @@ def limit_exponent(tensor, min):
     return result_tensor
 
 
-def get_constant_parameter(init_log_value, learn):
+def get_constant_parameter(init_log_value, learn=True):
     return torch.nn.Parameter(torch.full((1,), init_log_value)[0], requires_grad=learn)
 
 
