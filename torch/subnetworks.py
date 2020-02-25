@@ -16,7 +16,7 @@ from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, 
 from blox.tensor.core import map_recursive
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from blox.torch.losses import CELoss, L2Loss, NLL
+from blox.torch.losses import CELogitsLoss, L2Loss, NLL
 from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential, ConstantUpdater
 from blox.torch.ops import apply_linear
 from blox.torch.ops import like, make_one_hot, mask_out
@@ -484,7 +484,7 @@ class LengthPredictorModule(nn.Module):
     
     def loss(self, inputs, model_output):
         losses = AttrDict()
-        losses.len_pred = CELoss(self._hp.length_pred_weight)(model_output.seq_len_logits, inputs.end_ind)
+        losses.len_pred = CELogitsLoss(self._hp.length_pred_weight)(model_output.seq_len_logits, inputs.end_ind)
         return losses
 
 

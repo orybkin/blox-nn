@@ -64,7 +64,7 @@ class KLDivLoss(Loss):
         return kl_divergence
 
 
-class CELoss(Loss):
+class CELogitsLoss(Loss):
     compute = staticmethod(torch.nn.functional.cross_entropy)
     
     
