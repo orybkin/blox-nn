@@ -172,6 +172,50 @@ class ConvBlockFirstDec(ConvBlockDec):
 ###
 
 
+def compute_same_padding(kernel_size):
+    """ Compute padding corresponding to a particular kernel size such that the result of a convolution with these
+    parameters won't change the dimensionality """
+    if kernel_size % 2 == 1:
+        return int((kernel_size - 1) / 2)
+    
+    raise NotImplementedError
+
+
+def tf2pt_padding_interface(padding, kernel_size):
+    """ Translates padding == 'same' or 'valid' into pytorch """
+
+    if padding == 'same':
+        if isinstance(kernel_size, int):
+            return compute_same_padding(kernel_size)
+        else:
+            return tuple(map(compute_same_padding, kernel_size))
+    elif padding == 'valid':
+        return 0
+    else:
+        return padding
+
+
+class Conv2d(nn.Conv2d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1,
+                 bias=True, padding_mode='zeros'):
+            
+        padding = tf2pt_padding_interface(padding, kernel_size)
+        super().__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
+
+
+class Conv1d(nn.Conv1d):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1,
+                 padding=0, dilation=1, groups=1,
+                 bias=True, padding_mode='zeros'):
+    
+        padding = tf2pt_padding_interface(padding, kernel_size)
+        super().__init__(in_channels, out_channels, kernel_size, stride, padding, dilation, groups, bias, padding_mode)
+
+
+###
+
+
 class BaseProcessingNet(ConcatSequential):
     """ Constructs a network that keeps the activation dimensions the same throughout the network
     Builds an MLP or CNN, depending on the builder. Alternatively uses custom blocks """
