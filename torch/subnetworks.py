@@ -413,17 +413,18 @@ class SeqEncodingModule(nn.Module):
             seq = torch.cat([seq, time], dim=2)
 
         proc_seq = self.run_net(seq)
-        proc_seq = proc_seq.view(sh)
+        proc_seq = proc_seq.view(sh[:2] + [-1] + sh[3:])
         return proc_seq
 
 
 class ConvSeqEncodingModule(SeqEncodingModule):
-    def build_network(self, input_size, hp):
+    def build_network(self, input_size, hp, out_dim=None):
         kernel_size = hp.conv_inf_enc_kernel_size
         assert kernel_size % 2 != 0     # need uneven kernel size for padding
         padding = int(np.floor(kernel_size / 2))
         block = partial(ConvBlock, d=1, kernel_size=kernel_size, padding=padding)
-        self.net = BaseProcessingNet(input_size, hp.nz_mid, hp.nz_enc, hp.conv_inf_enc_layers, hp.builder, block=block)
+        out_dim = out_dim or hp.nz_enc
+        self.net = BaseProcessingNet(input_size, hp.nz_mid, out_dim, hp.conv_inf_enc_layers, hp.builder, block=block)
         
     def run_net(self, seq):
         # 1d convolutions expect length-last
@@ -579,5 +580,3 @@ class ActionConditioningWrapper(nn.Module):
         padded_actions = torch.nn.functional.pad(actions, (0, 0, 0, net_outputs.shape[1] - actions.shape[1], 0, 0))
         net_outputs = batch_apply(torch.cat([net_outputs, broadcast_final(padded_actions, input)], dim=2), self.ac_net)
         return net_outputs
-
-
