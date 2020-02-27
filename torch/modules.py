@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from blox.tensor.ops import concat_inputs
-from blox import AttrDict
+from blox import AttrDict, batch_apply
 from blox.basic_types import map_dict
 
 
@@ -81,6 +81,15 @@ class ConcatSequential(nn.Sequential):
         if self.detached:
             inp = inp.detach()
         return super().forward(inp)
+
+
+class Batched(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+        
+    def forward(self, *args):
+        return batch_apply(args, self.net, separate_arguments=True)
 
 
 class Updater(nn.Module):
