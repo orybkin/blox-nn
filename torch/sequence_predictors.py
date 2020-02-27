@@ -12,13 +12,19 @@ class LSTMPredictor(nn.Module):
         
         self.net = nn.LSTM(in_dim, hp.nz_mid_lstm, num_layers=hp.n_lstm_layers, batch_first=True, **kwargs)
         
-        self.out_projection = nn.Linear(hp.nz_mid_lstm, out_dim)
+        net_out_dim = hp.nz_mid_lstm
+        if self.net.bidirectional:
+            net_out_dim = net_out_dim * 2
+        self.out_projection = nn.Linear(net_out_dim, out_dim)
     
     def forward(self, *inp):
         inp = concat_inputs(*inp, dim=2)
         
-        c0 = inp.new_zeros(self._hp.n_lstm_layers, inp.shape[0], self._hp.nz_mid_lstm)
-        h0 = inp.new_zeros(self._hp.n_lstm_layers, inp.shape[0], self._hp.nz_mid_lstm)
+        n = self._hp.n_lstm_layers
+        if self.net.bidirectional:
+            n = n * 2
+        c0 = inp.new_zeros(n, inp.shape[0], self._hp.nz_mid_lstm)
+        h0 = inp.new_zeros(n, inp.shape[0], self._hp.nz_mid_lstm)
         
         out = self.net(inp, (c0, h0))[0]
         projected = batch_apply(out.contiguous(), self.out_projection)
