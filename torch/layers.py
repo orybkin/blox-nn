@@ -222,7 +222,7 @@ class BaseProcessingNet(ConcatSequential):
     
     def __init__(self, in_dim, mid_dim, out_dim, num_layers, builder, block=None, detached=False,
                  final_activation=None):
-        super().__init__(detached)
+        super().__init__(detached=detached)
 
         if block is None:
             block = builder.def_block

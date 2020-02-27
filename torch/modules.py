@@ -72,8 +72,8 @@ class ConcatSequential(nn.Sequential):
     """ A sequential net that accepts multiple arguments and concatenates them along dimension 1
     The class also broadcasts the tensors to fill last dimensions.
     """
-    def __init__(self, detached=False):
-        super().__init__()
+    def __init__(self, *args, detached=False):
+        super().__init__(*args)
         self.detached = detached
     
     def forward(self, *inp):
