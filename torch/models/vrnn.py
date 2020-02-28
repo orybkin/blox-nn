@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 
-from blox import AttrDict, batch_apply, rmap
+from blox import AttrDict, batch_apply
 from blox.torch.dist import Gaussian, ProbabilisticModel, get_constant_parameter
-from blox.torch.recurrent_modules import BaseCell, InitLSTMCell, CustomLSTMCell
+from blox.torch.recurrent_modules import BaseCell, InitLSTMCell
 from blox.torch.variational import setup_variational_inference
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
@@ -19,7 +19,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
     # It is possible to implement a stochastic lstm in pytorch JIT
     # It is also possible to implement the training with nn.LSTM and test time with manual unroll
     
-    def __init__(self, hp, x_size, context_size):
+    def __init__(self, hp, x_size, context_size, reinit_size):
         """ Implements the cell for the variational RNN (Chung et al., 2015)
         
         :param hp: an object with attributes:
@@ -39,17 +39,38 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         inf_inp_dim = x_size
         prior_inp_dim = x_size
         
-        self.inf_lstm = CustomLSTMCell(hp,
-                                       input_size=x_size + context_size,
-                                       output_size=inf_inp_dim)
-        self.gen_lstm = CustomLSTMCell(hp,
-                                       input_size=hp.nz_vae + context_size,  #pred_input_size,
-                                       output_size=x_size)
+        self.inf_lstm = InitLSTMCell(hp,
+                                     input_size=x_size + context_size,
+                                     output_size=inf_inp_dim,
+                                     reset_input_size=reinit_size)
+        self.gen_lstm = InitLSTMCell(hp,
+                                     input_size=x_size + hp.nz_vae + context_size,  #pred_input_size,
+                                     output_size=x_size,
+                                     reset_input_size=reinit_size)
         
         # TODO make a more expressive prior
         self.inf, self.prior = setup_variational_inference(hp, prior_inp_dim=prior_inp_dim, inf_inp_dim=inf_inp_dim)
     
-    def forward(self, context=None, x_prime=None, more_context=None, z=None):
+    def init_state(self, first_x, context=None, more_context=None):
+        """ Initializes the state of the LSTM. Can be used to pass global context. Also performs the first step of
+        inference LSTM """
+        if context is not None:
+            self.inf_lstm.init_state(context)
+            self.gen_lstm.init_state(context)
+        
+        # TODO it would be extremely convenient to get rid of this by redefining the lstm to output one more frame
+        # the loss would normally not be placed on that frame, but if it was, it would be a zero-frames conditioned VRNN
+        # TODO the above needs to be done for an additional reason: currently the predictive model is not conditioned
+        # on the context of the first frame, only the inference model is conditioned on it
+        # (this is fine for action-conditioned prediction, where the first frame doesn't have context
+        
+        # Note: this might be unnecessary since the first frame is already provided above
+        if more_context is not None:
+            # TODO is there a way to get rid of this?
+            more_context = more_context[:, 0]
+        self.inf_lstm(first_x, context, more_context)
+    
+    def forward(self, x, context=None, x_prime=None, more_context=None, z=None):
         """
         
         :param x: observation at current step
@@ -61,19 +82,24 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         """
         # TODO to get rid of more_context, make an interface that allows context structures
         output = AttrDict()
+        if x_prime is None:
+            x_prime = torch.zeros_like(x)  # Used when sequence isn't available
         
-        output.p_z = self.prior(torch.zeros_like(x_prime))  # the input is only used to read the batchsize atm
-        if x_prime is not None:
-            output.q_z = self.inf(self.inf_lstm(x_prime, context, more_context).output)
-    
-        if z is None:
-            if self._sample_prior:
-                z = Gaussian(output.p_z).sample()
-            else:
-                z = Gaussian(output.q_z).sample()
-    
-        pred_input = [z, context, more_context]
-    
+        output.q_z = self.inf(self.inf_lstm(x_prime, context, more_context).output)
+        output.p_z = self.prior(x)  # the input is only used to read the batchsize atm
+
+        if z is not None:
+            pass        # use z directly
+        elif self._sample_prior:
+            z = Gaussian(output.p_z).sample()
+        else:
+            z = Gaussian(output.q_z).sample()
+        
+        # Note: providing x might be unnecessary if it is provided in the init_state
+        pred_input = [x, z, context, more_context]
+        
+        # x_t is fed back in as input (technically, it is unnecessary, however, the lstm is setup to observe a frame
+        # every step because it observes one in the beginning).
         output.x = self.gen_lstm(*pred_input).output
         return output
     
@@ -104,7 +130,7 @@ class VRNN(nn.Module):
         
         # TODO add global context
         # TODO add sequence context
-        self.lstm = VRNNCell(hp, x_dim, context_dim).make_lstm()
+        self.lstm = VRNNCell(hp, x_dim, context_dim, 0).make_lstm()
         
         self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
     
@@ -118,23 +144,20 @@ class VRNN(nn.Module):
         :param context: a context sequence. Prediction is conditioned on all context up to and including this moment
         :return:
         """
-        lstm_inputs = AttrDict(x_prime=x)
+        lstm_inputs = AttrDict(x_prime=x[:, 1:])
         if context is not None:
-            lstm_inputs.update(more_context=context)
+            lstm_inputs.update(more_context=context[:, 1:])
             
-        outputs = self.lstm(inputs=lstm_inputs, length=output_length + conditioning_length)
-        # The way the conditioning works now is by zeroing out the loss on the KL divergence and returning less frames
-        # That way the network can pass the info directly through z. I can also implement conditioning by feeding
-        # the frames directly into predictor. that would require passing previous frames to the VRNNCell and
-        # using a fake frame to condition the 0th frame on.
-        outputs = rmap(lambda ten: ten[:, conditioning_length:], outputs)
-        outputs.conditioning_length = conditioning_length
+        initial_inputs = AttrDict(x=x[:, :conditioning_length])
+        
+        self.lstm.cell.init_state(x[:, 0], more_context=context)
+        outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs, length=output_length)
         return outputs
     
-    def loss(self, inputs, outputs, log_error_arr=False):
+    def loss(self, inputs, model_output, log_error_arr=False):
         losses = AttrDict()
         
         losses.kl = KLDivLoss(self._hp.kl_weight) \
-            (outputs.q_z, outputs.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
+            (model_output.q_z, model_output.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
         
         return losses
