@@ -69,5 +69,5 @@ def concat_inputs(*inp, dim=1):
     """ Concatenates tensors together. Used if the tensors need to be passed to a neural network as input. """
     inp = list(filter(lambda ten: ten is not None, inp))
     max_n_dims = np.max([len(tensor.shape) for tensor in inp])
-    inp = torch.cat([add_n_dims(tensor, max_n_dims - len(tensor.shape)) for tensor in inp], dim=1)
+    inp = torch.cat([add_n_dims(tensor, max_n_dims - len(tensor.shape)) for tensor in inp], dim=dim)
     return inp

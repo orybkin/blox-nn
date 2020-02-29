@@ -105,6 +105,7 @@ class SequentialVB(nn.Module, ProbabilisticModel):
         self.inference = ConcatSequential(
             SeqPredictorFactory(hp.inference_arch, hp, x_dim + context_dim, x_dim, bidirectional=hp.bidirectional),
             Batched(inf),
+            dim=2,
         )
         
         self.generator = SRNNGeneratorCell(hp, x_dim, context_dim, prior).make_lstm()
