@@ -154,7 +154,8 @@ class VRNN(nn.Module):
         initial_inputs = AttrDict(x=x[:, :conditioning_length + 1])
         
         self.lstm.cell.init_state(x[:, 0], more_context=context)
-        outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs, length=output_length)
+        outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs,
+                            length=output_length + conditioning_length)
         outputs = rmap(lambda ten: ten[:, conditioning_length:], outputs)
         return outputs
     
