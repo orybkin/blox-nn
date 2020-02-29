@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 
-from blox import AttrDict, batch_apply
+from blox import AttrDict, batch_apply, rmap
 from blox.torch.dist import Gaussian, ProbabilisticModel, get_constant_parameter
 from blox.torch.recurrent_modules import BaseCell, InitLSTMCell
 from blox.torch.variational import setup_variational_inference
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
+from blox.torch.ops import pad
 
 
 class VRNNCell(BaseCell, ProbabilisticModel):
@@ -144,14 +145,17 @@ class VRNN(nn.Module):
         :param context: a context sequence. Prediction is conditioned on all context up to and including this moment
         :return:
         """
+        x = pad(x, pad_front=1, dim=1)
         lstm_inputs = AttrDict(x_prime=x[:, 1:])
         if context is not None:
+            context = pad(context, pad_front=1, dim=1)
             lstm_inputs.update(more_context=context[:, 1:])
             
-        initial_inputs = AttrDict(x=x[:, :conditioning_length])
+        initial_inputs = AttrDict(x=x[:, :conditioning_length + 1])
         
         self.lstm.cell.init_state(x[:, 0], more_context=context)
         outputs = self.lstm(inputs=lstm_inputs, initial_seq_inputs=initial_inputs, length=output_length)
+        outputs = rmap(lambda ten: ten[:, conditioning_length:], outputs)
         return outputs
     
     def loss(self, inputs, model_output, log_error_arr=False):
