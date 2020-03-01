@@ -115,6 +115,27 @@ class LocScaleDistribution(Distribution):
         return self._log_sigma
     
 
+class Laplacian(LocScaleDistribution):
+    def nll(self, x):
+        return torch.abs(x - self.mu) / self.scale + self.log_scale + np.log(2)
+    
+    @property
+    def scale(self):
+        # NOTE: this is NOT the std of the distribution, and self.sigma is NOT the std
+        return self.sigma
+    
+    @property
+    def log_scale(self):
+        # NOTE: this is NOT the log std of the distribution, and self.log_sigma is NOT the log std
+        return self.log_sigma
+    
+    def sample(self, x):
+        raise NotImplementedError
+
+
+class Gaussian(LocScaleDistribution):
+    """ Represents a gaussian distribution """
+    # TODO: implement a dict conversion function
         
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
