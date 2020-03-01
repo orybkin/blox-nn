@@ -86,9 +86,7 @@ class Beta(Distribution):
         return self.dist._log_normalizer(self.dist.concentration0, self.dist.concentration1)
 
 
-class Gaussian(Distribution):
-    """ Represents a gaussian distribution """
-    # TODO: implement a dict conversion function
+class LocScaleDistribution(Distribution):
     def __init__(self, mu, log_sigma=None, sigma=None):
         """
         
@@ -103,6 +101,20 @@ class Gaussian(Distribution):
         self.mu = mu
         self._log_sigma = log_sigma
         self._sigma = sigma
+
+    @property
+    def sigma(self):
+        if self._sigma is None:
+            self._sigma = self._log_sigma.exp()
+        return self._sigma
+
+    @property
+    def log_sigma(self):
+        if self._log_sigma is None:
+            self._log_sigma = self._sigma.log()
+        return self._log_sigma
+    
+
         
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
@@ -121,18 +133,6 @@ class Gaussian(Distribution):
         
         sigma = ((x - self.mu) ** 2).mean().sqrt()
         return Gaussian(mu=self.mu, sigma=sigma).nll(x)
-    
-    @property
-    def sigma(self):
-        if self._sigma is None:
-            self._sigma = self._log_sigma.exp()
-        return self._sigma
-    
-    @property
-    def log_sigma(self):
-        if self._log_sigma is None:
-            self._log_sigma = self._sigma.log()
-        return self._log_sigma
 
     @property
     def shape(self):
