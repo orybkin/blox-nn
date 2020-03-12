@@ -514,7 +514,7 @@ class LinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
     def build_network(self):
         super().build_network()
-        self.projection = nn.Sequential(nn.Linear(self.get_state_size() * 2, self.get_state_size()))
+        self.projection = nn.Sequential(nn.Linear(self.get_state_dim() * 2, self.get_state_dim()))
 
     def forward(self, hidden1, hidden2, *inputs):
         hidden_state = self.projection(concat_inputs(hidden1, hidden2))
@@ -525,7 +525,7 @@ class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
     def build_network(self):
         super().build_network()
-        split_state_size = int(self.get_state_size() / (self._hp.n_lstm_layers*2))
+        split_state_size = int(self.get_state_dim() / (self._hp.n_lstm_layers * 2))
         self.projections = torch.nn.ModuleList([nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
                             for _ in range(self._hp.n_lstm_layers*2)])
 

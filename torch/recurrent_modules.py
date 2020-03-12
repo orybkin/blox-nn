@@ -6,6 +6,7 @@ from blox import AttrDict, rmap_list
 from blox.basic_types import map_dict, listdict2dictlist, subdict, filter_dict
 from blox.torch.dist import stack
 from blox.torch.layers import BaseProcessingNet, FCBlock
+from blox.torch.recurrent.conv_lstm import SingleConv2dLSTMCell
 
 
 # Note: this post has an example custom implementation of LSTM from which we can derive a ConvLSTM/TreeLSTM
@@ -125,23 +126,31 @@ class BaseCell(nn.Module):
 class CustomLSTMCell(BaseCell):
     def __init__(self, hp, input_size, output_size):
         """ An LSTMCell wrapper """
-        super(CustomLSTMCell, self).__init__()
-        
+        super().__init__()
+    
         hidden_size = hp.nz_mid_lstm
         n_layers = hp.n_lstm_layers
-        
+    
         # TODO make this a param dict
         self._hp = hp
         self.input_size = input_size
         self.output_size = output_size
         self.hidden_size = hidden_size
         self.n_layers = n_layers
-        self.embed = nn.Linear(input_size, hidden_size)
-        # TODO use the LSTM class
-        self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
-        self.output = nn.Linear(hidden_size, output_size)
         self.init_hidden()
-        self.init_bias(self.lstm)
+    
+        if hp.use_conv_lstm:
+            # TODO this has to be a submodule
+            self.embed = nn.Conv2d(input_size, hidden_size, kernel_size=3, padding=1)
+            # TODO check if the bias is initialized correctly
+            self.lstm = nn.ModuleList([SingleConv2dLSTMCell(hidden_size, hidden_size, kernel_size=3, padding=1) for i in range(self.n_layers)])
+            self.output = nn.Conv2d(hidden_size, output_size, kernel_size=3, padding=1)
+        else:
+            self.embed = nn.Linear(input_size, hidden_size)
+            # TODO use the LSTM class
+            self.lstm = nn.ModuleList([nn.LSTMCell(hidden_size, hidden_size) for i in range(self.n_layers)])
+            self.output = nn.Linear(hidden_size, output_size)
+            self.init_bias(self.lstm)
         
     @staticmethod
     def init_bias(lstm):
@@ -154,7 +163,7 @@ class CustomLSTMCell(BaseCell):
 
     def init_hidden(self):
         # TODO Karl wrote some initializers that could be useful here
-        self.initial_hidden = nn.Parameter(torch.zeros(1, self.get_state_size()))
+        self.initial_hidden = nn.Parameter(torch.zeros(1, *self.get_state_shape()))
         self.hidden = None
 
     def reset(self):
@@ -162,8 +171,14 @@ class CustomLSTMCell(BaseCell):
         # calling set_hidden_var is necessary here since direct assignment is intercepted by nn.Module
         self.set_hidden_var(self.initial_hidden.repeat_interleave(self._hp.batch_size, 0))
         
-    def get_state_size(self):
-        return self.hidden_size * self.n_layers * 2
+    def get_state_shape(self):
+        if self._hp.use_conv_lstm:
+            return [self.hidden_size * self.n_layers * 2, 1, 1]
+        else:
+            return [self.hidden_size * self.n_layers * 2]
+        
+    def get_state_dim(self):
+        return self.get_state_shape()[0]
     
     def var2state(self, var):
         """ Converts a tensor to a list of tuples that represents the state of the LSTM """
@@ -192,8 +207,14 @@ class CustomLSTMCell(BaseCell):
             self.reset()
         
         cell_input = concat_inputs(*cell_input)
-        inp_extra_dim = list(cell_input.shape[2:])  # This keeps trailing dimensions (should be all shape 1)
-        embedded = self.embed(cell_input.view(-1, self.input_size))
+        inp_extra_dim = []
+        
+        if not self._hp.use_conv_lstm:
+            # TODO put in the embed module
+            inp_extra_dim = list(cell_input.shape[2:])  # This keeps trailing dimensions (should be all shape 1)
+            cell_input = cell_input.view(-1, self.input_size)
+            
+        embedded = self.embed(cell_input)
         h_in = embedded
         for i in range(self.n_layers):
             self.hidden[i] = self.lstm[i](h_in, self.hidden[i])
@@ -213,7 +234,7 @@ class CustomLSTMCell(BaseCell):
     
     def set_hidden_var(self, var):
         self.hidden = self.var2state(var)
-
+    
 
 class InitLSTMCell(CustomLSTMCell):
     """ A wrapper around LSTM that conditionally initializes it with a neural network
@@ -226,11 +247,15 @@ class InitLSTMCell(CustomLSTMCell):
         self.reset_input_size = reset_input_size
         
         if reset_input_size != 0:
+            block = None
+            if not hp.use_conv_lstm:
+                block = FCBlock
             self.init_module = BaseProcessingNet(reset_input_size, self._hp.nz_mid,
-                                                 self.get_state_size(), 1, hp.builder, FCBlock)
+                                                 self.get_state_dim(), 1, hp.builder, block)
     
     def init_state(self, init_input):
-        init_input = init_input.view(init_input.shape[0], self.reset_input_size)
+        if not self._hp.use_conv_lstm:
+            init_input = init_input.view(init_input.shape[0], self.reset_input_size)
         self.hidden_var = self.init_module(init_input)
 
 
@@ -275,7 +300,7 @@ class LSTMCellInitializer(nn.Module):
         super().__init__()
         self._hp = hp
         self._cell = cell
-        self._hidden_size = self._cell.get_state_size()
+        self._hidden_size = self._cell.get_state_dim()
 
     def forward(self, *inputs):
         raise NotImplementedError
