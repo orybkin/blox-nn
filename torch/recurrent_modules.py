@@ -310,7 +310,10 @@ class ZeroLSTMCellInitializer(LSTMCellInitializer):
     """Initializes hidden to constant 0."""
     def forward(self, *inputs):
         def get_init_hidden():
-            return inputs[0].new_zeros((inputs[0].shape[0], self._hidden_sz))
+            sh = (inputs[0].shape[0], self._hidden_sz)
+            if self._hp.use_conv_lstm:
+                sh = sh + (1, 1)
+            return inputs[0].new_zeros(sh)
         return get_init_hidden(), get_init_hidden()
 
 
@@ -319,7 +322,7 @@ class MLPLSTMCellInitializer(LSTMCellInitializer):
     def __init__(self, hp, cell, input_sz):
         super().__init__(hp, cell)
         from blox.torch.subnetworks import Predictor    # to avoid cyclic import
-        self.net = Predictor(self._hp, input_sz, output_dim=2 * self._hidden_size, spatial=False,
+        self.net = Predictor(self._hp, input_sz, output_dim=2 * self._hidden_size, spatial=hp.use_conv_lstm,
                              num_layers=self._hp.init_mlp_layers, mid_size=self._hp.init_mlp_mid_sz)
 
     def forward(self, *inputs):

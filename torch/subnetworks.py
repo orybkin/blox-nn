@@ -514,7 +514,7 @@ class LinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
     def build_network(self):
         super().build_network()
-        self.projection = nn.Sequential(nn.Linear(self.get_state_dim() * 2, self.get_state_dim()))
+        self.projection = nn.Linear(self.get_state_dim() * 2, self.get_state_dim())
 
     def forward(self, hidden1, hidden2, *inputs):
         hidden_state = self.projection(concat_inputs(hidden1, hidden2))
@@ -526,15 +526,20 @@ class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     def build_network(self):
         super().build_network()
         split_state_size = int(self.get_state_dim() / (self._hp.n_lstm_layers * 2))
-        self.projections = torch.nn.ModuleList([nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
-                            for _ in range(self._hp.n_lstm_layers*2)])
+        
+        if self._hp.use_conv_lstm:
+            projection = lambda: nn.Conv2d(split_state_size * 2, split_state_size, kernel_size=3, padding=1)
+        else:
+            projection = lambda: nn.Linear(split_state_size * 2, split_state_size)
+        
+        self.projections = torch.nn.ModuleList([projection() for _ in range(self._hp.n_lstm_layers*2)])
 
     def forward(self, hidden1, hidden2, *inputs):
-        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, -1)]))
-        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, -1)]))
+        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, 1)]))
+        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, 1)]))
         chunked_projected = [projection(concat_inputs(h1, h2))
                              for projection, h1, h2 in zip(self.projections, chunked_hidden1, chunked_hidden2)]
-        hidden_state = torch.cat(chunked_projected, dim=-1)
+        hidden_state = torch.cat(chunked_projected, dim=1)
         return super().forward(hidden_state, *inputs)
 
 
