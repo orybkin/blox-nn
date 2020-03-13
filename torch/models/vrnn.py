@@ -158,6 +158,6 @@ class VRNN(nn.Module):
         losses = AttrDict()
         
         losses.kl = KLDivLoss(self._hp.kl_weight) \
-            (model_output.q_z, model_output.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
+            (model_output.q_z, model_output.p_z, reduction=[-1, -2, -3, -4], log_error_arr=log_error_arr)
         
         return losses
