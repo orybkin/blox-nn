@@ -35,9 +35,16 @@ def batchwise_index(generalized_tensor, index, dim=1):
     :param index: must be a tensor of shape [batch_size]
     :return tensor t2 such that t2[i] = tensor[i,index[i]]
     """
-    
-    bs = generalized_tensor.shape[0]
-    return ndim.swapaxes(generalized_tensor, 1, dim)[np.arange(bs), index]
+    if len(index.shape) == 1:
+        bs = generalized_tensor.shape[0]
+        return ndim.swapaxes(generalized_tensor, 1, dim)[np.arange(bs), index]
+    else:
+        # If index is two-dimensional, retrieve multiple values per batch element
+        bs, queries = index.shape
+        ar_array = np.arange(bs)[:, None].repeat(queries, 1)
+        
+        out = ndim.swapaxes(generalized_tensor, 1, dim)[ar_array.reshape(-1), index.reshape(-1)]
+        return out.reshape([bs, queries] + list(out.shape[1:]))
 
 
 def batchwise_assign(tensor, index, value):
