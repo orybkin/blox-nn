@@ -10,7 +10,7 @@ import torch
 
 
 class GaussianPredictor(Predictor):
-    def __init__(self, hp, input_dim, gaussian_dim=None, spatial=False):
+    def __init__(self, hp, input_dim, gaussian_dim=None, spatial=True):
         if gaussian_dim is None:
             gaussian_dim = hp.nz_vae
             
