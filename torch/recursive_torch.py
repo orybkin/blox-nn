@@ -1,4 +1,5 @@
 import torch
+from blox import rmap, rmap_list
 from blox.tensor.ops import recursively
 
 
@@ -12,5 +13,7 @@ class Porch:
         fn = getattr(torch, item)
         return recursively(fn)
     
+    def cat(self, struct_list, dim):
+        return rmap_list(lambda *x: torch.cat(x, dim), struct_list)
     
 porch = Porch()
