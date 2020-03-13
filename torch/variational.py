@@ -1,5 +1,5 @@
 from blox import AttrDict
-from blox.torch.dist import Gaussian, UnitGaussian, SequentialGaussian_SharedPQ, ProbabilisticModel
+from blox.torch.dist import Gaussian, SequentialGaussian_SharedPQ, ProbabilisticModel
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
 from blox.torch.dist import get_constant_parameter
@@ -17,8 +17,7 @@ class GaussianPredictor(Predictor):
         super().__init__(hp, input_dim, gaussian_dim * 2, spatial=spatial)
     
     def forward(self, *inputs):
-        # TODO remove .tensor()
-        return Gaussian(super().forward(*inputs)).tensor()
+        return Gaussian(super().forward(*inputs), concat_dim=1)
 
 
 class ApproximatePosterior(GaussianPredictor):
@@ -37,7 +36,7 @@ class FixedPrior(nn.Module):
         self.hp = hp
 
     def forward(self, cond, *args):  # ignored because fixed prior
-        return UnitGaussian([cond.shape[0], self.hp.nz_vae], cond.device).tensor()
+        return Gaussian.get_unit_gaussian([cond.shape[0], self.hp.nz_vae] + list(cond.shape[2:]), cond.device)
 
 
 class VariationalInference2LayerSharedPQ(nn.Module):

@@ -89,7 +89,7 @@ class Beta(Distribution):
 class Gaussian(Distribution):
     """ Represents a gaussian distribution """
     # TODO: implement a dict conversion function
-    def __init__(self, mu, log_sigma=None, sigma=None):
+    def __init__(self, mu, log_sigma=None, sigma=None, concat_dim=-1):
         """
         
         :param mu: the mean. this parameter should have the shape of the desired distribution
@@ -98,11 +98,12 @@ class Gaussian(Distribution):
         if log_sigma is None and sigma is None:
             if not isinstance(mu, torch.Tensor):
                 import pdb; pdb.set_trace()
-            mu, log_sigma = torch.chunk(mu, 2, -1)
+            mu, log_sigma = torch.chunk(mu, 2, concat_dim)
             
         self.mu = mu
         self._log_sigma = log_sigma
         self._sigma = sigma
+        self.concat_dim = concat_dim
         
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
@@ -166,7 +167,7 @@ class Gaussian(Distribution):
         return Gaussian(self.mu[item], self._log_sigma[item])
  
     def tensor(self):
-        return torch.cat([self.mu, self._log_sigma], dim=-1)
+        return torch.cat([self.mu, self._log_sigma], dim=self.concat_dim)
     
     def to_dict(self):
         d = {'mu': self.mu}
@@ -178,6 +179,12 @@ class Gaussian(Distribution):
             d.update({'sigma': self._sigma})
         return d
     
+    @staticmethod
+    def get_unit_gaussian(size, device):
+        mu = torch.zeros(size, device=device)
+        log_sigma = torch.zeros(size, device=device)
+        return Gaussian(mu, log_sigma)
+
 
 class OptimalVarianceGaussian(Gaussian):
     """ Technically not a distribution, however, it can compute NLL by adjusting it's variance to the datum at hand """
@@ -185,13 +192,6 @@ class OptimalVarianceGaussian(Gaussian):
     def nll(self, x):
         return self.optimal_variance_nll(x)
     
-
-class UnitGaussian(Gaussian):
-    def __init__(self, size, device):
-        mu = torch.zeros(size, device=device)
-        log_sigma = torch.zeros(size, device=device)
-        super().__init__(mu, log_sigma)
-
 
 class SequentialGaussian_SharedPQ(Distribution):
     """ stacks two Gaussians """
