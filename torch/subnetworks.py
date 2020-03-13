@@ -61,7 +61,7 @@ class ConvEncoder(nn.Module):
         super().__init__()
         self._hp = hp
         
-        n = hp.builder.get_num_layers(hp.img_sz)
+        n = hp.builder.get_num_layers(hp.img_sz, hp.n_conv_layers)
         self.net = GetIntermediatesSequential(hp.skips_stride) if hp.use_skips else nn.Sequential()
         
         self.net.add_module('input', ConvBlockEnc(in_dim=hp.input_nc, out_dim=hp.ngf, normalization=None,
@@ -181,7 +181,7 @@ class ConvDecoder(nn.Module):
         super().__init__()
 
         self._hp = hp
-        n = get_num_conv_layers(hp.img_sz)
+        n = get_num_conv_layers(hp.img_sz, hp.n_conv_layers)
         self.net = SkipInputSequential(hp.skips_stride) if hp.use_skips else nn.Sequential()
         out_dim = hp.ngf * 2 ** (n - 3)
         self.net.add_module('net',
@@ -406,6 +406,8 @@ class SeqEncodingModule(nn.Module):
 
     def forward(self, seq):
         sh = list(seq.shape)
+        for s in seq.shape[2:]:
+            assert s == 1
         seq = seq.view(sh[:2] + [-1])
     
         if self.add_time:
