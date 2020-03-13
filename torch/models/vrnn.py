@@ -91,9 +91,9 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         if z is not None:
             pass        # use z directly
         elif self._sample_prior:
-            z = Gaussian(output.p_z).sample()
+            z = output.p_z.sample()
         else:
-            z = Gaussian(output.q_z).sample()
+            z = output.q_z.sample()
         
         # Note: providing x might be unnecessary if it is provided in the init_state
         pred_input = [x, z, context, more_context]

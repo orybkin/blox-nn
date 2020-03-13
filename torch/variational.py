@@ -47,7 +47,7 @@ class VariationalInference2LayerSharedPQ(nn.Module):
 
     def forward(self, e_l, e_r, e_tilde):
         g1 = self.q1(e_l, e_r, e_tilde)
-        z1 = Gaussian(g1).sample()
+        z1 = g1.sample()
         g2 = self.q2(z1, e_l, e_r)
         return SequentialGaussian_SharedPQ(g1, z1, g2)
 
@@ -60,7 +60,7 @@ class TwolayerPriorSharedPQ(nn.Module):
 
     def forward(self, e_l, e_r):
         g1 = self.p1(e_l, e_r)
-        z1 = Gaussian(g1).sample()
+        z1 = g1.sample()
         g2 = self.q_p_shared(z1, e_l, e_r)  # make sure its the same order of arguments as in usage above!!
 
         return SequentialGaussian_SharedPQ(g1, z1, g2)
@@ -103,7 +103,7 @@ class AttentiveInference(nn.Module):
         return output
     
     def loss(self, q_z, p_z):
-        if q_z.numel() == 0:
+        if q_z.mu.numel() == 0:
             return {}
         
         return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, log_error_arr=True, reduction=[-1, -2]))
@@ -202,9 +202,9 @@ class CVAE(nn.Module, ProbabilisticModel):
         output.p_z = self.prior(cond)  # the input is only used to read the batchsize atm
     
         if self._sample_prior:
-            output.z = Gaussian(output.p_z).sample()
+            output.z = output.p_z.sample()
         else:
-            output.z = Gaussian(output.q_z).sample()
+            output.z = output.q_z.sample()
     
         output.mu = self.gen(output.z, cond)
         

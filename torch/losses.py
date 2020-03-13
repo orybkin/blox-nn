@@ -60,7 +60,7 @@ class L2Loss(Loss):
 
 class KLDivLoss(Loss):
     def compute(self, estimates, targets):
-        kl_divergence = Gaussian(estimates).kl_divergence(Gaussian(targets))
+        kl_divergence = estimates.kl_divergence(targets)
         return kl_divergence
 
 
