@@ -89,6 +89,8 @@ def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, only_targ
             return type(tensors)(map(recursive_map, tensors))
         elif isinstance(tensors, dict):
             return type(tensors)(map_dict(recursive_map, tensors))
+        elif hasattr(tensors, 'to_dict'):
+            return type(tensors)(**map_dict(recursive_map, tensors.to_dict()))
         else:
             # Misc elements - neither collections nor targets
             if only_target:
@@ -118,6 +120,10 @@ def make_recursive_list(fn):
             return map_dict(recursive_map, listdict2dictlist(tensors))
         elif isinstance(tensors[0], torch.Tensor):
             return fn(*tensors)
+        elif hasattr(tensors[0], 'to_dict'):
+            old_type = type(tensors[0])
+            tensors = type(tensors)(map(lambda x: x.to_dict(), tensors))
+            return old_type(**map_dict(recursive_map, listdict2dictlist(tensors)))
         else:
             try:
                 return fn(*tensors)

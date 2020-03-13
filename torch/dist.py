@@ -168,6 +168,16 @@ class Gaussian(Distribution):
     def tensor(self):
         return torch.cat([self.mu, self._log_sigma], dim=-1)
     
+    def to_dict(self):
+        d = {'mu': self.mu}
+        if self._log_sigma is None and self._sigma is None:
+            raise ValueError
+        if self._log_sigma is not None:
+            d.update({'log_sigma': self._log_sigma})
+        if self._sigma is not None:
+            d.update({'sigma': self._sigma})
+        return d
+    
 
 class OptimalVarianceGaussian(Gaussian):
     """ Technically not a distribution, however, it can compute NLL by adjusting it's variance to the datum at hand """
