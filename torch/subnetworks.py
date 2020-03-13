@@ -298,8 +298,16 @@ class Attention(nn.Module):
     def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None, attention_weights=None):
         """Performs multi-layered, multi-headed attention."""
         if timestep is not None:
-            return batchwise_index(values, timestep[:,0].long()), None
-            
+            mult = int(timestep.shape[0] / keys.shape[0])
+            if mult > 1:
+                timestep = timestep.reshape(-1, mult)
+                result = batchwise_index(values, timestep.long())
+                return result.reshape([-1] + list(result.shape[2:])), None
+                
+            return batchwise_index(values, timestep[:, 0].long()), None
+        
+        raise NotImplementedError('This us not updated to the fact the values and keys are no longer appropriately tiled')
+        
         query = self.query_net(*query_input)
         
         # Attend
