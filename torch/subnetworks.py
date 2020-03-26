@@ -414,7 +414,7 @@ class SeqEncodingModule(nn.Module):
 
     def forward(self, seq):
         sh = list(seq.shape)
-        for s in seq.shape[2:]:
+        for s in seq.shape[3:]:
             assert s == 1
         seq = seq.view(sh[:2] + [-1])
     
