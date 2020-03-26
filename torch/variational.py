@@ -102,11 +102,11 @@ class AttentiveInference(nn.Module):
         output.q_z = self.q(e_l, e_r, e_tilde)
         return output
     
-    def loss(self, q_z, p_z):
+    def loss(self, q_z, p_z, weights=1):
         if q_z.mu.numel() == 0:
             return {}
         
-        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, log_error_arr=True, reduction=[-1, -2, -3, -4]))
+        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, weights=weights, log_error_arr=True, reduction=[-1, -2, -3, -4]))
     
     def get_dummy(self, e_l):
         raise NotImplementedError('do we need to run inference in this case?')
