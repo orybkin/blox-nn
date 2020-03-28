@@ -3,7 +3,7 @@ from blox.torch.dist import Gaussian, SequentialGaussian_SharedPQ, Probabilistic
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
 from blox.torch.dist import get_constant_parameter
-from blox.torch.ops import batchwise_index, make_one_hot
+from blox.torch.ops import batchwise_index, make_one_hot, get_dim_inds
 
 import torch.nn as nn
 import torch
@@ -106,7 +106,9 @@ class AttentiveInference(nn.Module):
         if q_z.mu.numel() == 0:
             return {}
         
-        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(q_z, p_z, weights=weights, log_error_arr=True, reduction=[-1, -2, -3, -4]))
+        inds = get_dim_inds(q_z)[1:]
+        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(
+            q_z, p_z, weights=weights, log_error_arr=True, reduction=inds))
     
     def get_dummy(self, e_l):
         raise NotImplementedError('do we need to run inference in this case?')
