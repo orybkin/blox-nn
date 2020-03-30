@@ -86,8 +86,8 @@ class Ndim():
         """ A decorator that allows a numpy function operate on torch tensors.
          Warning: this does NOT make the function differentiable """
         
-        def wrapper(*args):
-            # TODO support **kwargs
+        def wrapper(*args, **kwargs):
+            # TODO support conversion of **kwargs
             
             found_tensor = find_element(args)
             if isinstance(found_tensor, torch.Tensor):
@@ -101,7 +101,7 @@ class Ndim():
                 convert_to = lambda el: ten2ar(el) if isinstance(el, torch.Tensor) else el
                 args = rmap(convert_to, args)
             
-            result = fn(*args)
+            result = fn(*args, **kwargs)
             
             if convert:
                 convert_fro = lambda el: ar2ten(el, found_tensor.device) if isinstance(el, np.ndarray) else el
