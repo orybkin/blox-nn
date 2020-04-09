@@ -122,6 +122,10 @@ class Gaussian(Distribution):
         
         sigma = ((x - self.mu) ** 2).mean().sqrt()
         return Gaussian(mu=self.mu, sigma=sigma).nll(x)
+
+    def reparametrize(self, eps):
+        """Reparametrizes noise sample eps with mean/variance of Gaussian."""
+        return self._sigma * eps + self.mu
     
     @property
     def sigma(self):
