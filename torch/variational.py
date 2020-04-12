@@ -214,7 +214,7 @@ class CVAE(nn.Module, ProbabilisticModel):
     
     def loss(self, inputs, outputs):
         losses = AttrDict()
-        losses.kl = KLDivLoss(self._hp.kl_weight)(outputs.q_z, outputs.p_z, reduction=[-1])
+        avg_inds = get_dim_inds(outputs.q_z)[1:]
+        losses.kl = KLDivLoss(self._hp.kl_weight)(outputs.q_z, outputs.p_z, reduction=avg_inds)
 
         return losses
-    

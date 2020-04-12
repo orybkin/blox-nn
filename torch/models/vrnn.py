@@ -4,7 +4,7 @@ import torch.nn as nn
 from blox import AttrDict, rmap
 from blox.torch.dist import Gaussian, ProbabilisticModel, get_constant_parameter
 from blox.torch.losses import KLDivLoss
-from blox.torch.ops import pad
+from blox.torch.ops import pad, get_dim_inds
 from blox.torch.recurrent_modules import BaseCell, InitLSTMCell
 from blox.torch.variational import setup_variational_inference
 
@@ -160,8 +160,10 @@ class VRNN(nn.Module):
     def loss(self, inputs, model_output, log_error_arr=False):
         losses = AttrDict()
         
+        # TODO this is wrong
+        avg_inds = get_dim_inds(model_output.q_z)[1:]
         losses.kl = KLDivLoss(self._hp.kl_weight) \
-            (model_output.q_z, model_output.p_z, reduction=[-1, -2, -3, -4], log_error_arr=log_error_arr)
+            (model_output.q_z, model_output.p_z, reduction=avg_inds, log_error_arr=log_error_arr)
         
         return losses
 
