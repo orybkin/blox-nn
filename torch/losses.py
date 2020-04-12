@@ -56,6 +56,14 @@ class L2Loss(Loss):
             targets = torch.tensor(targets, device=estimates.device, dtype=estimates.dtype)
         l2_loss = torch.nn.MSELoss(reduction='none')(estimates, targets)
         return l2_loss
+    
+
+class L1Loss(Loss):
+    def compute(self, estimates, targets):
+        if not isinstance(targets, torch.Tensor):
+            targets = torch.tensor(targets, device=estimates.device, dtype=estimates.dtype)
+        l1_loss = torch.nn.L1Loss(reduction='none')(estimates, targets)
+        return l1_loss
 
 
 class KLDivLoss(Loss):
@@ -64,7 +72,7 @@ class KLDivLoss(Loss):
         return kl_divergence
 
 
-class CELoss(Loss):
+class CELogitsLoss(Loss):
     compute = staticmethod(torch.nn.functional.cross_entropy)
     
     

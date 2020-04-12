@@ -29,7 +29,7 @@ def limit_exponent(tensor, min):
     return result_tensor
 
 
-def get_constant_parameter(init_log_value, learn):
+def get_constant_parameter(init_log_value, learn=True):
     return torch.nn.Parameter(torch.full((1,), init_log_value)[0], requires_grad=learn)
 
 
@@ -86,9 +86,7 @@ class Beta(Distribution):
         return self.dist._log_normalizer(self.dist.concentration0, self.dist.concentration1)
 
 
-class Gaussian(Distribution):
-    """ Represents a gaussian distribution """
-    # TODO: implement a dict conversion function
+class LocScaleDistribution(Distribution):
     def __init__(self, mu, log_sigma=None, sigma=None, concat_dim=-1):
         """
         
@@ -104,7 +102,24 @@ class Gaussian(Distribution):
         self._log_sigma = log_sigma
         self._sigma = sigma
         self.concat_dim = concat_dim
-        
+
+    @property
+    def sigma(self):
+        if self._sigma is None:
+            self._sigma = self._log_sigma.exp()
+        return self._sigma
+
+    @property
+    def log_sigma(self):
+        if self._log_sigma is None:
+            self._log_sigma = self._sigma.log()
+        return self._log_sigma
+
+
+class Gaussian(LocScaleDistribution):
+    """ Represents a gaussian distribution """
+    # TODO: implement a dict conversion function
+    
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
 
@@ -126,18 +141,6 @@ class Gaussian(Distribution):
     def reparametrize(self, eps):
         """Reparametrizes noise sample eps with mean/variance of Gaussian."""
         return self._sigma * eps + self.mu
-    
-    @property
-    def sigma(self):
-        if self._sigma is None:
-            self._sigma = self._log_sigma.exp()
-        return self._sigma
-    
-    @property
-    def log_sigma(self):
-        if self._log_sigma is None:
-            self._log_sigma = self._sigma.log()
-        return self._log_sigma
 
     @property
     def shape(self):
@@ -195,6 +198,24 @@ class OptimalVarianceGaussian(Gaussian):
     
     def nll(self, x):
         return self.optimal_variance_nll(x)
+
+
+class Laplacian(LocScaleDistribution):
+    def nll(self, x):
+        return torch.abs(x - self.mu) / self.scale + self.log_scale + np.log(2)
+    
+    @property
+    def scale(self):
+        # NOTE: this is NOT the std of the distribution, and self.sigma is NOT the std
+        return self.sigma
+    
+    @property
+    def log_scale(self):
+        # NOTE: this is NOT the log std of the distribution, and self.log_sigma is NOT the log std
+        return self.log_sigma
+    
+    def sample(self, x):
+        raise NotImplementedError
     
 
 class SequentialGaussian_SharedPQ(Distribution):

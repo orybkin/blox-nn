@@ -16,7 +16,7 @@ from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, 
 from blox.tensor.core import map_recursive
 from blox.torch.layers import BaseProcessingNet, ConvBlockEnc, \
     ConvBlockDec, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlock
-from blox.torch.losses import CELoss, L2Loss, NLL
+from blox.torch.losses import CELogitsLoss, L2Loss, NLL
 from blox.torch.modules import AttrDictPredictor, SkipInputSequential, GetIntermediatesSequential, ConstantUpdater
 from blox.torch.ops import apply_linear
 from blox.torch.ops import like, make_one_hot, mask_out
@@ -423,17 +423,18 @@ class SeqEncodingModule(nn.Module):
             seq = torch.cat([seq, time], dim=2)
 
         proc_seq = self.run_net(seq)
-        proc_seq = proc_seq.view(sh)
+        proc_seq = proc_seq.view(sh[:2] + [-1] + sh[3:])
         return proc_seq
 
 
 class ConvSeqEncodingModule(SeqEncodingModule):
-    def build_network(self, input_size, hp):
+    def build_network(self, input_size, hp, out_dim=None):
         kernel_size = hp.conv_inf_enc_kernel_size
         assert kernel_size % 2 != 0     # need uneven kernel size for padding
         padding = int(np.floor(kernel_size / 2))
         block = partial(ConvBlock, d=1, kernel_size=kernel_size, padding=padding)
-        self.net = BaseProcessingNet(input_size, hp.nz_mid, hp.nz_enc, hp.conv_inf_enc_layers, hp.builder, block=block)
+        out_dim = out_dim or hp.nz_enc
+        self.net = BaseProcessingNet(input_size, hp.nz_mid, out_dim, hp.conv_inf_enc_layers, hp.builder, block=block)
         
     def run_net(self, seq):
         # 1d convolutions expect length-last
@@ -494,7 +495,7 @@ class LengthPredictorModule(nn.Module):
     
     def loss(self, inputs, model_output):
         losses = AttrDict()
-        losses.len_pred = CELoss(self._hp.length_pred_weight)(model_output.seq_len_logits, inputs.end_ind)
+        losses.len_pred = CELogitsLoss(self._hp.length_pred_weight)(model_output.seq_len_logits, inputs.end_ind)
         return losses
 
 
@@ -594,5 +595,3 @@ class ActionConditioningWrapper(nn.Module):
         padded_actions = torch.nn.functional.pad(actions, (0, 0, 0, net_outputs.shape[1] - actions.shape[1], 0, 0))
         net_outputs = batch_apply(torch.cat([net_outputs, broadcast_final(padded_actions, input)], dim=2), self.ac_net)
         return net_outputs
-
-

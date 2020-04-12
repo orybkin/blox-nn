@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from blox.tensor.ops import concat_inputs
-from blox import AttrDict
+from blox import AttrDict, batch_apply
 from blox.basic_types import map_dict
 
 
@@ -72,15 +72,25 @@ class ConcatSequential(nn.Sequential):
     """ A sequential net that accepts multiple arguments and concatenates them along dimension 1
     The class also broadcasts the tensors to fill last dimensions.
     """
-    def __init__(self, detached=False):
-        super().__init__()
+    def __init__(self, *args, detached=False, dim=1):
+        super().__init__(*args)
         self.detached = detached
+        self.dim = dim
     
     def forward(self, *inp):
-        inp = concat_inputs(*inp)
+        inp = concat_inputs(*inp, dim=self.dim)
         if self.detached:
             inp = inp.detach()
         return super().forward(inp)
+
+
+class Batched(nn.Module):
+    def __init__(self, net):
+        super().__init__()
+        self.net = net
+        
+    def forward(self, *args):
+        return batch_apply(args, self.net, separate_arguments=True)
 
 
 class Updater(nn.Module):

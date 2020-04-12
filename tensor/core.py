@@ -1,5 +1,6 @@
 from blox.basic_types import map_dict, listdict2dictlist
 import torch
+from functools import partial
 
 
 def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
@@ -30,6 +31,15 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
     output_reshaped_back = reshape_from(output)
     if unshape_inputs: reshape_from(input_reshaped)
     return output_reshaped_back
+
+
+def batched(fn):
+    def wrapper(*args, **kwargs):
+        # TODO support both args and kwargs
+        inputs = args if len(args) > 0 else kwargs
+        return batch_apply(inputs, fn, separate_arguments=True)
+        
+    return wrapper
 
 
 def find(inp, success_fn):
