@@ -238,10 +238,13 @@ class BaseProcessingNet(ConcatSequential):
         self.apply(init_weights_xavier)
         
         
-def get_num_conv_layers(img_sz):
+def get_num_conv_layers(img_sz, n_conv_layers=None):
     n = math.log2(img_sz)
     assert n == round(n), 'imageSize must be a power of 2'
     assert n >= 3, 'imageSize must be at least 8'
+    if isinstance(n_conv_layers, str) and n_conv_layers[:2] == 'n-':
+        return int(n) - int(n_conv_layers[2:])
+        
     return int(n)
 
 

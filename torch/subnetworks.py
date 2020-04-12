@@ -61,7 +61,7 @@ class ConvEncoder(nn.Module):
         super().__init__()
         self._hp = hp
         
-        n = hp.builder.get_num_layers(hp.img_sz)
+        n = hp.builder.get_num_layers(hp.img_sz, hp.n_conv_layers)
         self.net = GetIntermediatesSequential(hp.skips_stride) if hp.use_skips else nn.Sequential()
         
         self.net.add_module('input', ConvBlockEnc(in_dim=hp.input_nc, out_dim=hp.ngf, normalization=None,
@@ -181,7 +181,7 @@ class ConvDecoder(nn.Module):
         super().__init__()
 
         self._hp = hp
-        n = get_num_conv_layers(hp.img_sz)
+        n = get_num_conv_layers(hp.img_sz, hp.n_conv_layers)
         self.net = SkipInputSequential(hp.skips_stride) if hp.use_skips else nn.Sequential()
         out_dim = hp.ngf * 2 ** (n - 3)
         self.net.add_module('net',
@@ -298,8 +298,16 @@ class Attention(nn.Module):
     def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None, attention_weights=None):
         """Performs multi-layered, multi-headed attention."""
         if timestep is not None:
-            return batchwise_index(values, timestep[:,0].long()), None
-            
+            mult = int(timestep.shape[0] / keys.shape[0])
+            if mult > 1:
+                timestep = timestep.reshape(-1, mult)
+                result = batchwise_index(values, timestep.long())
+                return result.reshape([-1] + list(result.shape[2:])), None
+                
+            return batchwise_index(values, timestep[:, 0].long()), None
+        
+        raise NotImplementedError('This us not updated to the fact the values and keys are no longer appropriately tiled')
+        
         query = self.query_net(*query_input)
         
         # Attend
@@ -406,6 +414,8 @@ class SeqEncodingModule(nn.Module):
 
     def forward(self, seq):
         sh = list(seq.shape)
+        for s in seq.shape[3:]:
+            assert s == 1
         seq = seq.view(sh[:2] + [-1])
     
         if self.add_time:
@@ -515,7 +525,7 @@ class LinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
     def build_network(self):
         super().build_network()
-        self.projection = nn.Sequential(nn.Linear(self.get_state_size() * 2, self.get_state_size()))
+        self.projection = nn.Linear(self.get_state_dim() * 2, self.get_state_dim())
 
     def forward(self, hidden1, hidden2, *inputs):
         hidden_state = self.projection(concat_inputs(hidden1, hidden2))
@@ -526,16 +536,21 @@ class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
     """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
     def build_network(self):
         super().build_network()
-        split_state_size = int(self.get_state_size() / (self._hp.n_lstm_layers*2))
-        self.projections = torch.nn.ModuleList([nn.Sequential(nn.Linear(split_state_size * 2, split_state_size))
-                            for _ in range(self._hp.n_lstm_layers*2)])
+        split_state_size = int(self.get_state_dim() / (self._hp.n_lstm_layers * 2))
+        
+        if self._hp.use_conv_lstm:
+            projection = lambda: nn.Conv2d(split_state_size * 2, split_state_size, kernel_size=3, padding=1)
+        else:
+            projection = lambda: nn.Linear(split_state_size * 2, split_state_size)
+        
+        self.projections = torch.nn.ModuleList([projection() for _ in range(self._hp.n_lstm_layers*2)])
 
     def forward(self, hidden1, hidden2, *inputs):
-        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, -1)]))
-        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, -1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, -1)]))
+        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, 1)]))
+        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, 1)]))
         chunked_projected = [projection(concat_inputs(h1, h2))
                              for projection, h1, h2 in zip(self.projections, chunked_hidden1, chunked_hidden2)]
-        hidden_state = torch.cat(chunked_projected, dim=-1)
+        hidden_state = torch.cat(chunked_projected, dim=1)
         return super().forward(hidden_state, *inputs)
 
 

@@ -87,7 +87,7 @@ class Beta(Distribution):
 
 
 class LocScaleDistribution(Distribution):
-    def __init__(self, mu, log_sigma=None, sigma=None):
+    def __init__(self, mu, log_sigma=None, sigma=None, concat_dim=-1):
         """
         
         :param mu: the mean. this parameter should have the shape of the desired distribution
@@ -96,11 +96,12 @@ class LocScaleDistribution(Distribution):
         if log_sigma is None and sigma is None:
             if not isinstance(mu, torch.Tensor):
                 import pdb; pdb.set_trace()
-            mu, log_sigma = torch.chunk(mu, 2, -1)
+            mu, log_sigma = torch.chunk(mu, 2, concat_dim)
             
         self.mu = mu
         self._log_sigma = log_sigma
         self._sigma = sigma
+        self.concat_dim = concat_dim
 
     @property
     def sigma(self):
@@ -113,30 +114,12 @@ class LocScaleDistribution(Distribution):
         if self._log_sigma is None:
             self._log_sigma = self._sigma.log()
         return self._log_sigma
-    
-
-class Laplacian(LocScaleDistribution):
-    def nll(self, x):
-        return torch.abs(x - self.mu) / self.scale + self.log_scale + np.log(2)
-    
-    @property
-    def scale(self):
-        # NOTE: this is NOT the std of the distribution, and self.sigma is NOT the std
-        return self.sigma
-    
-    @property
-    def log_scale(self):
-        # NOTE: this is NOT the log std of the distribution, and self.log_sigma is NOT the log std
-        return self.log_sigma
-    
-    def sample(self, x):
-        raise NotImplementedError
 
 
 class Gaussian(LocScaleDistribution):
     """ Represents a gaussian distribution """
     # TODO: implement a dict conversion function
-        
+    
     def sample(self):
         return self.mu + self.sigma * torch.randn_like(self.mu)
 
@@ -154,6 +137,10 @@ class Gaussian(LocScaleDistribution):
         
         sigma = ((x - self.mu) ** 2).mean().sqrt()
         return Gaussian(mu=self.mu, sigma=sigma).nll(x)
+
+    def reparametrize(self, eps):
+        """Reparametrizes noise sample eps with mean/variance of Gaussian."""
+        return self._sigma * eps + self.mu
 
     @property
     def shape(self):
@@ -187,22 +174,49 @@ class Gaussian(LocScaleDistribution):
         return Gaussian(self.mu[item], self._log_sigma[item])
  
     def tensor(self):
-        return torch.cat([self.mu, self._log_sigma], dim=-1)
+        return torch.cat([self.mu, self._log_sigma], dim=self.concat_dim)
     
+    def to_dict(self):
+        d = {'mu': self.mu}
+        if self._log_sigma is None and self._sigma is None:
+            raise ValueError
+        if self._log_sigma is not None:
+            d.update({'log_sigma': self._log_sigma})
+        if self._sigma is not None:
+            d.update({'sigma': self._sigma})
+        return d
+    
+    @staticmethod
+    def get_unit_gaussian(size, device):
+        mu = torch.zeros(size, device=device)
+        log_sigma = torch.zeros(size, device=device)
+        return Gaussian(mu, log_sigma)
+
 
 class OptimalVarianceGaussian(Gaussian):
     """ Technically not a distribution, however, it can compute NLL by adjusting it's variance to the datum at hand """
     
     def nll(self, x):
         return self.optimal_variance_nll(x)
+
+
+class Laplacian(LocScaleDistribution):
+    def nll(self, x):
+        return torch.abs(x - self.mu) / self.scale + self.log_scale + np.log(2)
     
-
-class UnitGaussian(Gaussian):
-    def __init__(self, size, device):
-        mu = torch.zeros(size, device=device)
-        log_sigma = torch.zeros(size, device=device)
-        super().__init__(mu, log_sigma)
-
+    @property
+    def scale(self):
+        # NOTE: this is NOT the std of the distribution, and self.sigma is NOT the std
+        return self.sigma
+    
+    @property
+    def log_scale(self):
+        # NOTE: this is NOT the log std of the distribution, and self.log_sigma is NOT the log std
+        return self.log_sigma
+    
+    def sample(self, x):
+        raise NotImplementedError
+    
 
 class SequentialGaussian_SharedPQ(Distribution):
     """ stacks two Gaussians """

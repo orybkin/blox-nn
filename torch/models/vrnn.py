@@ -91,9 +91,9 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         if z is not None:
             pass        # use z directly
         elif self._sample_prior:
-            z = Gaussian(output.p_z).sample()
+            z = output.p_z.sample()
         else:
-            z = Gaussian(output.q_z).sample()
+            z = output.q_z.sample()
         
         # Note: providing x might be unnecessary if it is provided in the init_state
         pred_input = [x, z, context, more_context]
@@ -161,7 +161,7 @@ class VRNN(nn.Module):
         losses = AttrDict()
         
         losses.kl = KLDivLoss(self._hp.kl_weight) \
-            (model_output.q_z, model_output.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
+            (model_output.q_z, model_output.p_z, reduction=[-1, -2, -3, -4], log_error_arr=log_error_arr)
         
         return losses
 
