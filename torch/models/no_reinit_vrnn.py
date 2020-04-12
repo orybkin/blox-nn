@@ -7,6 +7,9 @@ from blox.torch.recurrent_modules import BaseCell, InitLSTMCell, CustomLSTMCell
 from blox.torch.variational import setup_variational_inference
 from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
+""" The NoReinitVRNN classes remove the cumbersome separate initialization from the VRNN classes,
+ unifying VRNN and ZeroVRNN. Unfortunately, NoReinitVRNN performance is untested and it is not recommended to use
+ in practice until that happens. """
 
 
 class NoReinitVRNNCell(BaseCell, ProbabilisticModel):

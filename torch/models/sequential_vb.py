@@ -12,6 +12,11 @@ from blox.torch.sequence_predictors import SeqPredictorFactory
 from blox.torch.modules import Batched
 from blox.tensor.ops import concat_inputs
 
+""" The Sequential Variational Bayes class is an attempt to separate the inference and generation LSTMs in order to
+make the code more manageable. It implements several different classes for inference RNN as well. Unfortunately,
+the performance of the SequentialVB class seems significantly worse than the VRNN class and it is not recommended to use,
+until tested and tuned properly. """
+
 
 class SRNNGeneratorCell(BaseCell):
     

@@ -4,6 +4,8 @@ from blox.torch.ops import pad
 
 
 class ZeroVRNN(VRNN):
+    """ The ZeroVRNN allows to generate an entire sequence from scratch instead of conditioning it on at least one frame
+    as the VRNN class requires. This is achieved by zero-padding the sequence. """
     def forward(self, x, output_length, conditioning_length, context=None):
         """
 
