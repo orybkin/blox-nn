@@ -9,7 +9,7 @@ from blox.torch.losses import KLDivLoss
 from blox.torch.subnetworks import Predictor
 
 
-class VRNNCell(BaseCell, ProbabilisticModel):
+class NoReinitVRNNCell(BaseCell, ProbabilisticModel):
     # TODO try to implement this with a bunch of standard LSTMs, not CustomLSTM?
     # This would be likely a lot faster since we can use cuda lstm
     # However it's unclear how to implement sampling: z's have to be sampled sequentially, but there might be no
@@ -82,7 +82,7 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         self.inf_lstm.reset()
 
 
-class ZeroVRNN(nn.Module):
+class NoReinitVRNN(nn.Module):
     """ Implements the variational RNN (Chung et al., 2015)
     The variational RNN can be used to model sequences of high-dimensional data. It is a sequential application
     of deep Variational Bayes (Kingma'14, Rezende'14)
@@ -104,7 +104,7 @@ class ZeroVRNN(nn.Module):
         
         # TODO add global context
         # TODO add sequence context
-        self.lstm = VRNNCell(hp, x_dim, context_dim).make_lstm()
+        self.lstm = NoReinitVRNNCell(hp, x_dim, context_dim).make_lstm()
         
         self.log_sigma = get_constant_parameter(hp.log_sigma, hp.learn_sigma)
     
