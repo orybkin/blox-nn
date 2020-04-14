@@ -40,7 +40,14 @@ class Distribution():
     def sample(self, x):
         raise NotImplementedError
     
-    def kl_divergence(self, x):
+    def kl_divergence(self, other):
+        raise NotImplementedError
+
+    def cross_entropy(self, other):
+        return self.entropy + self.kl_divergence(other)
+    
+    @property
+    def entopy(self):
         raise NotImplementedError
 
 
@@ -132,6 +139,10 @@ class Gaussian(LocScaleDistribution):
         # Negative log likelihood (probability)
         return 0.5 * torch.pow((x - self.mu) / self.sigma, 2) + self.log_sigma + 0.5 * np.log(2 * np.pi)
     
+    @property
+    def entropy(self):
+        return (np.log(2 * np.pi * np.e) / 2) + self.log_sigma
+    
     def optimal_variance_nll(self, x):
         """ Computes the NLL of a gaussian with the optimal (constant) variance for these data """
         
@@ -217,6 +228,24 @@ class Laplacian(LocScaleDistribution):
     def sample(self, x):
         raise NotImplementedError
     
+    
+class Categorical(Distribution):
+    def __init__(self, p):
+        self.p = p
+        
+    @property
+    def entropy(self):
+        return safe_entropy(self.p, -1)
+    
+    def kl_divergence(self, other):
+        return torch.sum(self.p * (self.p / other.p).log())
+    
+    def cross_entropy1(self, other):
+        return -torch.sum(self.p * other.p.log())
+    
+    def __add__(self, other):
+        return Categorical((self.p + other.p) / 2)
+
 
 class SequentialGaussian_SharedPQ(Distribution):
     """ stacks two Gaussians """
