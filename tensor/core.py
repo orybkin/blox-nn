@@ -33,6 +33,36 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
     return output_reshaped_back
 
 
+def batch_apply2(fn, *args, unshape_inputs=False, **kwargs):
+    """ Provides an interface that is unified with map-like functions"""
+    # TODO this should be the base implementation. Remove the cases and only use the unified implementation
+    # TODO this should be the default interface (i.e. batch_apply instead of batch_apply2)
+    
+    if len(args) == 0:
+        return batch_apply(kwargs, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
+    elif len(kwargs) == 0:
+        return batch_apply(args, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
+    else:
+        # TODO test
+        reference_tensor = find_tensor([args, kwargs], min_dim=2)
+        if not isinstance(reference_tensor, torch.Tensor):
+            raise ValueError("couldn't find a reference tensor")
+    
+        batch, time = reference_tensor.shape[:2]
+        reshape_to = lambda tensor: tensor.view((batch * time,) + tensor.shape[2:])
+        reshape_from = lambda tensor: tensor.view((batch, time,) + tensor.shape[1:])
+    
+        reshaped_args = rmap(reshape_to, args)
+        reshaped_kwargs = rmap(reshape_to, kwargs)
+        output = fn(*reshaped_args, **reshaped_kwargs)
+        
+        if unshape_inputs:
+            rmap(reshape_from, reshaped_args)
+            rmap(reshape_from, reshaped_kwargs)
+            
+        return rmap(reshape_from, output)
+
+
 def batched(fn):
     def wrapper(*args, **kwargs):
         # TODO support both args and kwargs
