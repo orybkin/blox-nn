@@ -3,6 +3,8 @@ from contextlib import contextmanager
 import numpy as np
 import torch
 from torch import distributions
+from torch.nn import CrossEntropyLoss
+
 
 def safe_entropy(dist, dim=None, eps=1e-12):
     """Computes entropy even if some entries are 0."""
@@ -230,8 +232,25 @@ class Laplacian(LocScaleDistribution):
     
     
 class Categorical(Distribution):
-    def __init__(self, p):
-        self.p = p
+    def __init__(self, p=None, log_p=None):
+        assert p is None or log_p is None
+        
+        self._log_p = log_p
+        self._p = p
+        
+    @property
+    def p(self):
+        if self._p is not None:
+            return self._p
+        elif self._log_p is not None:
+            return self._log_p.exp()
+
+    @property
+    def log_p(self):
+        if self._p is not None:
+            return self._p.log()
+        elif self._log_p is not None:
+            return self._log_p
         
     @property
     def entropy(self):
@@ -240,11 +259,16 @@ class Categorical(Distribution):
     def kl_divergence(self, other):
         return torch.sum(self.p * (self.p / other.p).log())
     
-    def cross_entropy1(self, other):
-        return -torch.sum(self.p * other.p.log())
+    def cross_entropy(self, other):
+        return -torch.sum(self.p * other.log_p)
     
     def __add__(self, other):
+        # Note, this is not a sum of random variables, but an equal mixture
         return Categorical((self.p + other.p) / 2)
+    
+    def nll(self, x):
+        if self._log_p is not None:
+            return CrossEntropyLoss(reduction='none')(self._log_p, x.long())
 
 
 class SequentialGaussian_SharedPQ(Distribution):
