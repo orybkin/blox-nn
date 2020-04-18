@@ -1,14 +1,13 @@
 import numpy as np
-from blox import AttrDict, batch_apply
-from blox.tensor.core import map_recursive
+from blox import AttrDict, batch_apply2, rmap
 from blox.tensor.ops import broadcast_final, get_dim_inds
-from blox.torch.dist import get_constant_parameter, Gaussian
 from blox.torch.layers import ConvBlockEnc, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlockDec
 from blox.torch.losses import NLL
 from blox.torch.modules import GetIntermediatesSequential, AttrDictPredictor, ConstantUpdater, SkipInputSequential
 from blox.torch.subnetworks import Predictor
 import torch
 import torch.nn as nn
+import torch.functional as F
 
 
 class Encoder(nn.Module):
@@ -50,101 +49,6 @@ class ConvEncoder(nn.Module):
 
     def forward(self, input):
         return self.net(input)
-
-
-class Decoder(nn.Module):
-    """ The decoder handles variation in the kinds of data that need to be decoded """
-    def __init__(self, hp, regress_actions):
-        super().__init__()
-        self._hp = hp
-        self.regress_actions = regress_actions
-        
-        if hp.builder.use_convs:
-            assert not (self._hp.add_weighted_pixel_copy & self._hp.pixel_shift_decoder)
-            
-            if self._hp.pixel_shift_decoder:
-                self.net = PixelShiftDecoder(hp)
-            elif self._hp.add_weighted_pixel_copy:
-                self.net = PixelCopyDecoder(hp)
-            else:
-                self.net = ConvDecoder(hp)
-                
-        else:
-            assert not self._hp.use_skips
-            assert not self._hp.add_weighted_pixel_copy
-            assert not self._hp.pixel_shift_decoder
-            state_predictor = Predictor(hp, hp.nz_enc, hp.state_dim, num_layers=hp.builder.get_num_layers())
-            self.net = AttrDictPredictor({'images': state_predictor})
-            
-        if self.regress_actions:
-            self.act_net = Predictor(hp, hp.nz_enc, hp.n_actions)
-            self.act_log_sigma = get_constant_parameter(0, hp.learn_beta)
-            self.act_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
-            
-        self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
-        self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
-        
-    def forward(self, input, **kwargs):
-        if not (self._hp.pixel_shift_decoder or self._hp.add_weighted_pixel_copy):
-            kwargs.pop('pixel_source')
-            
-        if not self._hp.use_skips:
-            kwargs.pop('skips')
-            
-        output = self.net(input, **kwargs)
-        
-        actions = torch.flatten(self.act_net(input), 1) if self.regress_actions else None
-        if actions is not None and self._hp.action_activation is not None:
-            actions = self._hp.action_activation(actions)
-        output.actions = actions
-        return output
-
-    def decode_seq(self, inputs, encodings):
-        """ Decodes a sequence of images given the encodings
-        
-        :param inputs:
-        :param encodings:
-        :param seq_len:
-        :return:
-        """
-        
-        def extend_to_seq(tensor):
-            return tensor[:, None].expand([tensor.shape[0], encodings.shape[1]] + list(tensor.shape[1:])).contiguous()
-
-        # TODO skip from the goal as well
-        seq_skips = map_recursive(extend_to_seq, inputs.skips)
-        pixel_source = [extend_to_seq(inputs.I_0), extend_to_seq(inputs.I_g)]
-
-        decoder_inputs = AttrDict(input=encodings, skips=seq_skips, pixel_source=pixel_source)
-        return batch_apply(decoder_inputs, self, separate_arguments=True)
-
-    def loss(self, inputs, model_output, extra_action=True, first_image=True, log_error_arr=False):
-        dense_losses = AttrDict()
-    
-        loss_gt = inputs.demo_seq
-        loss_pad_mask = inputs.pad_mask
-        if not first_image:
-            loss_gt = loss_gt[:, 1:]
-            loss_pad_mask = loss_pad_mask[:, 1:]
-
-        weights = broadcast_final(loss_pad_mask, inputs.demo_seq)
-        
-        avg_inds = get_dim_inds(loss_gt)[1:]
-        dense_losses.dense_img_rec = NLL(self._hp.dense_img_rec_weight, breakdown=1) \
-            (Gaussian(model_output.images, self.log_sigma),
-             loss_gt, weights=weights, reduction=avg_inds, log_error_arr=log_error_arr)
-    
-        if self._hp.regress_actions:
-            actions_pad_mask = inputs.pad_mask[:, :-1]
-            loss_actions = model_output.actions
-            if extra_action:
-                loss_actions = loss_actions[:, :-1]
-                
-            weights = broadcast_final(actions_pad_mask, inputs.actions)
-            dense_losses.dense_action_rec = NLL(self._hp.dense_action_rec_weight) \
-                (loss_actions, inputs.actions, weights=weights, reduction=[-1, -2], log_error_arr=log_error_arr)
-    
-        return dense_losses
 
 
 class ConvDecoder(nn.Module):
@@ -189,6 +93,41 @@ class ConvDecoder(nn.Module):
         output.feat = self.net(*args, **kwargs)
         output.images = self.gen_head(output.feat)
         return output
+        
+
+class ProbabilisticConvDecoder(nn.Module):
+    """ This is a version of ConvDecoder that outputs a distribution """
+    def __init__(self, hp, decoder_net):
+        super().__init__()
+        self._hp = hp
+        self.net = decoder_net
+        
+        if hp.decoder_distribution == 'gaussian':
+            self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
+            self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
+
+    def forward(self, *args, **kwargs):
+        outputs = self.net(*args, **kwargs)
+        
+        if self._hp.decoder_distribution == 'gaussian':
+            # The sigma has to be blown up because of reshaping that happens later
+            outputs.distr = Gaussian(outputs.images, self.log_sigma * torch.ones_like(outputs.images))
+        
+        return outputs
+
+    def nll(self, estimates, targets, weights=1, log_error_arr=False):
+        """
+        
+        :param estimates: a distribution object
+        """
+        losses = AttrDict()
+        
+        criterion = NLL(self._hp.dense_img_rec_weight, breakdown=1)
+        avg_inds = get_dim_inds(targets)[1:]
+        losses.dense_img_rec = criterion(
+            estimates, targets, weights=weights, reduction=avg_inds, log_error_arr=log_error_arr)
+    
+        return losses
 
 
 class PixelCopyDecoder(ConvDecoder):
@@ -252,3 +191,91 @@ class PixelShiftDecoder(PixelCopyDecoder):
         _, output.images = self.mask_and_merge(
             output.feat, pixel_source + output.warped_sources + [output.images])
         return output
+
+
+class DecoderModule(ProbabilisticConvDecoder):
+    """ The decoder handles variation in the kinds of data that need to be decoded """
+    
+    def __init__(self, hp, regress_actions):
+        self._hp = hp
+        decoder_net = self.build_decoder_net()
+        super().__init__(hp, decoder_net)
+        
+        self.regress_actions = regress_actions
+        if regress_actions:
+            self.act_net = Predictor(hp, hp.nz_enc, hp.n_actions)
+            self.act_log_sigma = get_constant_parameter(0, hp.learn_beta)
+            self.act_sigma_updater = ConstantUpdater(self.act_log_sigma, 20, 'decoder_action_sigma')
+
+    def build_decoder_net(self):
+        hp = self._hp
+        if self._hp.builder.use_convs:
+            assert not (self._hp.add_weighted_pixel_copy & self._hp.pixel_shift_decoder)
+            if self._hp.pixel_shift_decoder:
+                decoder_net = PixelShiftDecoder(self._hp)
+            elif self._hp.add_weighted_pixel_copy:
+                decoder_net = PixelCopyDecoder(self._hp)
+            else:
+                decoder_net = ConvDecoder(self._hp)
+        else:
+            assert not self._hp.use_skips
+            assert not self._hp.add_weighted_pixel_copy
+            assert not self._hp.pixel_shift_decoder
+            state_predictor = Predictor(hp, hp.nz_enc, hp.state_dim, num_layers=hp.builder.get_num_layers())
+            decoder_net = AttrDictPredictor({'images': state_predictor})
+
+        return decoder_net
+
+    def forward(self, input, **kwargs):
+        if not (self._hp.pixel_shift_decoder or self._hp.add_weighted_pixel_copy):
+            kwargs.pop('pixel_source')
+        
+        if not self._hp.use_skips:
+            kwargs.pop('skips')
+        
+        output = super().forward(input, **kwargs)
+        
+        actions = torch.flatten(self.act_net(input), 1) if self.regress_actions else None
+        if actions is not None and self._hp.action_activation is not None:
+            actions = self._hp.action_activation(actions)
+        output.actions = actions
+        return output
+    
+    def decode_seq(self, inputs, encodings):
+        """ Decodes a sequence of images given the encodings
+
+        :param inputs:
+        :param encodings:
+        :param seq_len:
+        :return:
+        """
+        
+        # TODO skip from the goal as well
+        extend_to_seq = lambda x: x[:, None][:, [0] * encodings.shape[1]].contiguous()
+        seq_skips = rmap(extend_to_seq, inputs.skips)
+        pixel_source = rmap(extend_to_seq, [inputs.I_0, inputs.I_g])
+        
+        return batch_apply2(self, input=encodings, skips=seq_skips, pixel_source=pixel_source)
+    
+    def loss(self, inputs, outputs, extra_action=True, first_image=True, log_error_arr=False):
+        loss_gt = inputs.demo_seq
+        loss_pad_mask = inputs.pad_mask
+        if not first_image:
+            loss_gt = loss_gt[:, 1:]
+            loss_pad_mask = loss_pad_mask[:, 1:]
+        
+        weights = broadcast_final(loss_pad_mask, inputs.demo_seq)
+        # Skip first frame
+        losses = self.nll(outputs.distr, loss_gt[:, 1:], weights[:, 1:], log_error_arr)
+        
+        if self._hp.regress_actions:
+            actions_pad_mask = inputs.pad_mask[:, :-1]
+            loss_actions = outputs.actions
+            if extra_action:
+                loss_actions = loss_actions[:, :-1]
+            
+            weights = broadcast_final(actions_pad_mask, inputs.actions)
+            losses.dense_action_rec = NLL(self._hp.dense_action_rec_weight) \
+                (loss_actions, inputs.actions, weights=weights, reduction=[-1, -2], log_error_arr=log_error_arr)
+        
+        return losses
