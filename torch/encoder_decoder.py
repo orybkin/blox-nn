@@ -95,6 +95,12 @@ class ConvDecoder(nn.Module):
         output.images = self.gen_head(output.feat)
         return output
         
+        
+class ImageCategorical(Categorical):
+    """ This converts the input image from -1..1 to 0..255"""
+    def nll(self, x):
+        return super().nll((x + 1) * 127.5)
+        
 
 class ProbabilisticConvDecoder(nn.Module):
     """ This is a wrapper over ConvDecoders that makes the output a distribution """
@@ -122,7 +128,7 @@ class ProbabilisticConvDecoder(nn.Module):
             images = outputs.images
             images = images.reshape(images.shape[0:1] + (256, 3) + images.shape[2:])
             
-            outputs.distr = Categorical(log_p=images)
+            outputs.distr = ImageCategorical(log_p=images)
             outputs.images = images.argmax(1).float() / 127.5 - 1
         
         return outputs
