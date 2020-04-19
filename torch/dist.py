@@ -268,7 +268,33 @@ class Categorical(Distribution):
     
     def nll(self, x):
         if self._log_p is not None:
-            return CrossEntropyLoss(reduction='none')(self._log_p, x.long())
+            return SmartCrossEntropyLoss(reduction='none')(self._log_p, x.long())
+
+
+class SmartCrossEntropyLoss(CrossEntropyLoss):
+    """ This is a helper class that automatically finds which dimension is the classification dimension
+    (as opposed to it always being dim=2) """
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor):
+        # Find the dimension that has the distribution
+        shape_target = np.array(target.shape)
+        shape_input = np.array(input.shape)
+        assert len(shape_target) + 1 == len(shape_input)
+
+        # First different index
+        diff_idx = (shape_target == shape_input[:-1]).argmin()
+        assert (shape_target[diff_idx:] == shape_input[diff_idx + 1:]).all()
+
+        # Batch
+        target = target.reshape((-1,) + target.shape[diff_idx:])
+        input = input.view((-1,) + input.shape[diff_idx:])
+        
+        loss = super().forward(input, target)
+        
+        if self.reduction == 'none':
+            loss = loss.view(tuple(shape_target[:diff_idx]) + loss.shape[1:])
+            
+        return loss
 
 
 class SequentialGaussian_SharedPQ(Distribution):
