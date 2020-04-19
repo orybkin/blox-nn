@@ -270,6 +270,16 @@ class Categorical(Distribution):
         if self._log_p is not None:
             return SmartCrossEntropyLoss(reduction='none')(self._log_p, x.long())
 
+    def to_dict(self):
+        d = dict()
+        if self._p is None and self._log_p is None:
+            raise ValueError
+        if self._p is not None:
+            d.update({'p': self._p})
+        if self._log_p is not None:
+            d.update({'log_p': self._log_p})
+        return d
+
 
 class SmartCrossEntropyLoss(CrossEntropyLoss):
     """ This is a helper class that automatically finds which dimension is the classification dimension
