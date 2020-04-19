@@ -283,7 +283,7 @@ class Categorical(Distribution):
 
 class SmartCrossEntropyLoss(CrossEntropyLoss):
     """ This is a helper class that automatically finds which dimension is the classification dimension
-    (as opposed to it always being dim=2) """
+    (as opposed to it always being dim=1) """
     
     def forward(self, input: torch.Tensor, target: torch.Tensor):
         # Find the dimension that has the distribution

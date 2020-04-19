@@ -97,7 +97,7 @@ class ConvDecoder(nn.Module):
         
 
 class ProbabilisticConvDecoder(nn.Module):
-    """ This is a version of ConvDecoder that outputs a distribution """
+    """ This is a wrapper over ConvDecoders that makes the output a distribution """
     def __init__(self, hp, decoder_net):
         super().__init__()
         self._hp = hp
