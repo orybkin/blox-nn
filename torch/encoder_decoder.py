@@ -1,6 +1,7 @@
 import numpy as np
 from blox import AttrDict, batch_apply2, rmap
 from blox.tensor.ops import broadcast_final, get_dim_inds
+from blox.torch.dist import get_constant_parameter, Gaussian, Categorical
 from blox.torch.layers import ConvBlockEnc, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlockDec
 from blox.torch.losses import NLL
 from blox.torch.modules import GetIntermediatesSequential, AttrDictPredictor, ConstantUpdater, SkipInputSequential
@@ -105,6 +106,11 @@ class ProbabilisticConvDecoder(nn.Module):
         if hp.decoder_distribution == 'gaussian':
             self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
             self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
+        elif hp.decoder_distribution == 'categorical':
+            # Children not supported
+            assert type(decoder_net) == ConvDecoder
+            self.net.gen_head = ConvBlockDec(in_dim=self.net.gen_head.params.in_dim, out_dim=256 * hp.input_nc,
+                                             normalization=None, activation=None, builder=hp.builder, upsample=False)
 
     def forward(self, *args, **kwargs):
         outputs = self.net(*args, **kwargs)
@@ -112,6 +118,12 @@ class ProbabilisticConvDecoder(nn.Module):
         if self._hp.decoder_distribution == 'gaussian':
             # The sigma has to be blown up because of reshaping that happens later
             outputs.distr = Gaussian(outputs.images, self.log_sigma * torch.ones_like(outputs.images))
+        elif self._hp.decoder_distribution == 'categorical':
+            images = outputs.images
+            images = images.reshape(images.shape[0:1] + (256, 3) + images.shape[2:])
+            
+            outputs.distr = Categorical(log_p=images)
+            outputs.images = images.argmax(1).float() / 127.5 - 1
         
         return outputs
 
