@@ -243,6 +243,7 @@ class Categorical(Distribution):
         if self._p is not None:
             return self._p
         elif self._log_p is not None:
+            raise NotImplementedError
             return self._log_p.exp()
 
     @property
