@@ -100,6 +100,16 @@ class ImageCategorical(Categorical):
     """ This converts the input image from -1..1 to 0..255"""
     def nll(self, x):
         return super().nll((x + 1) * 127.5)
+
+    @property
+    def mle(self):
+        return self.log_p.argmax(1).float() / 127.5 - 1
+
+    @property
+    def mean(self):
+        p = self._log_p.exp() / self._log_p.exp().sum(1, keepdim=True)
+        value = broadcast_final(torch.arange(256).to(p.device).float()[None], p) / 127.5 - 1
+        return (p * value.float()).sum(1)
         
 
 class ProbabilisticConvDecoder(nn.Module):
