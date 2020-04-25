@@ -4,6 +4,8 @@ import numpy as np
 import torch
 from torch import distributions
 from torch.nn import CrossEntropyLoss
+from torch.nn import functional as F
+from blox.torch.ops import find_extra_dim
 
 
 def safe_entropy(dist, dim=None, eps=1e-12):
@@ -233,6 +235,7 @@ class Laplacian(LocScaleDistribution):
     
 class Categorical(Distribution):
     def __init__(self, p=None, log_p=None):
+        # TODO log_p is actually unnormalized in most cases
         assert p is None or log_p is None
         
         self._log_p = log_p
@@ -243,8 +246,8 @@ class Categorical(Distribution):
         if self._p is not None:
             return self._p
         elif self._log_p is not None:
-            raise NotImplementedError
-            return self._log_p.exp()
+            # TODO use pytorch implementation?
+            return self._log_p.exp() / self._log_p.exp().sum(1, keepdim=True)
 
     @property
     def log_p(self):
@@ -269,7 +272,7 @@ class Categorical(Distribution):
     
     def nll(self, x):
         if self._log_p is not None:
-            return SmartCrossEntropyLoss(reduction='none')(self._log_p, x.long())
+            return SmartCrossEntropyLoss(reduction='none')(self._log_p, x.round().long())
 
     def to_dict(self):
         d = dict()
