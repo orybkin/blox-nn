@@ -192,3 +192,20 @@ def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1):
         size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
         size = list(zip(size[::2], size[1::2]))
         return np.pad(generalized_tensor, size, mode='constant')
+
+def find_extra_dim(smaller, larger):
+    """ This function finds the position of extra dimension in two tensors that only differ by one dimension
+    
+    :param smaller: a tensor
+    :param larger: a tensor that the same shape as smaller, except for one extra dimension that can be anywhere
+    :return: the integer index of the extra dimension
+    """
+    shape_smaller = np.array(smaller.shape)
+    shape_larger = np.array(larger.shape)
+    assert len(shape_smaller) + 1 == len(shape_larger)
+    
+    # First different index
+    diff_idx = (shape_smaller == shape_larger[:-1]).argmin()
+    assert (shape_smaller[diff_idx:] == shape_larger[diff_idx + 1:]).all()
+    
+    return diff_idx

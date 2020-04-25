@@ -288,15 +288,8 @@ class SmartCrossEntropyLoss(CrossEntropyLoss):
     
     def forward(self, input: torch.Tensor, target: torch.Tensor):
         # Find the dimension that has the distribution
-        shape_target = np.array(target.shape)
-        shape_input = np.array(input.shape)
-        assert len(shape_target) + 1 == len(shape_input)
-
-        # First different index
-        diff_idx = (shape_target == shape_input[:-1]).argmin()
-        assert (shape_target[diff_idx:] == shape_input[diff_idx + 1:]).all()
-
-        # Batch
+        diff_idx = find_extra_dim(target, input)
+        shape_target = target.shape
         target = target.reshape((-1,) + target.shape[diff_idx:])
         input = input.view((-1,) + input.shape[diff_idx:])
         
