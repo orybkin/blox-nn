@@ -192,6 +192,26 @@ def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1):
         size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
         size = list(zip(size[::2], size[1::2]))
         return np.pad(generalized_tensor, size, mode='constant')
+    
+    
+def unpackbits(ten, dim=-1):
+    """ Applies np.unpackbits """
+    assert ten.dtype == torch.uint8
+    arr = ten2ar(ten)
+    bit_arr = np.unpackbits(np.expand_dims(arr, dim), dim)
+    return torch.from_numpy(bit_arr).to(ten.device)
+
+    # A simpler implementation would go as follows:
+    # unpackbits = ndim.torched(np.unpackbits)
+
+
+def packbits(ten, dim=-1):
+    """ Applies np.unpackbits """
+    assert ten.dtype == torch.uint8
+    arr = ten2ar(ten)
+    bit_arr = np.packbits(arr, dim).squeeze(dim)
+    return torch.from_numpy(bit_arr).to(ten.device)
+
 
 def find_extra_dim(smaller, larger):
     """ This function finds the position of extra dimension in two tensors that only differ by one dimension
