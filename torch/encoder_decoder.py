@@ -1,7 +1,8 @@
 import numpy as np
 from blox import AttrDict, batch_apply2, rmap
 from blox.tensor.ops import broadcast_final, get_dim_inds
-from blox.torch.dist import get_constant_parameter, Gaussian, Categorical
+from blox.torch.ops import unpackbits, combine_dim, packbits, find_extra_dim
+from blox.torch.dist import get_constant_parameter, Gaussian, Categorical, Bernoulli
 from blox.torch.layers import ConvBlockEnc, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlockDec
 from blox.torch.losses import NLL
 from blox.torch.modules import GetIntermediatesSequential, AttrDictPredictor, ConstantUpdater, SkipInputSequential
@@ -97,7 +98,11 @@ class ConvDecoder(nn.Module):
         
         
 class ImageCategorical(Categorical):
-    """ This converts the input image from -1..1 to 0..255"""
+    """ This converts the input image from -1..1 to 0..255. This is useful to represent an image as a categorical
+    distribution over all pixel values. It is factorized over colors and spatial locations.
+    
+    It should be initialized with a tensor batch x pixel_values x image_dims, where pixel_valuse=256, the number of
+    different values a pixel is allowed to take."""
     def nll(self, x):
         return super().nll((x + 1) * 127.5)
 
@@ -107,10 +112,40 @@ class ImageCategorical(Categorical):
 
     @property
     def mean(self):
-        p = self._log_p.exp() / self._log_p.exp().sum(1, keepdim=True)
-        value = broadcast_final(torch.arange(256).to(p.device).float()[None], p) / 127.5 - 1
-        return (p * value.float()).sum(1)
+        template = torch.arange(256)
+        p = self.p
+        value = broadcast_final(template.to(p.device).float()[None], p)
+        return (p * value.float()).sum(1) / 127.5 - 1
+
+
+class ImageBitwiseCategorical(Bernoulli):
+    """ This is useful to represent a bitwise distribution - a distribution over each bit in a tensor
+    
+    It should be initialized with a tensor batch x bits x image_dims, where bits=8, the number of bits needed to
+    describe each channel value.
+    """
+
+    def nll(self, x):
+        dim = find_extra_dim(x, self.log_p)
+        x_bitwise = unpackbits(((x + 1) * 127.5).round().byte(), dim)
         
+        nll = super().nll(x_bitwise.float())
+        return combine_dim(nll, dim, dim + 2)
+
+    @property
+    def mle(self):
+        log_p = self.log_p
+        bits_mle = log_p > 0
+        mle = packbits(bits_mle, 1).float()
+        return mle / 127.5 - 1
+
+    @property
+    def mean(self):
+        template = torch.tensor([128, 64, 32, 16, 8, 4, 2, 1])
+        p = self.p
+        value = broadcast_final(template.to(p.device).float()[None], p)
+        return (p * value.float()).sum(1) / 127.5 - 1
+
 
 class ProbabilisticConvDecoder(nn.Module):
     """ This is a wrapper over ConvDecoders that makes the output a distribution """
