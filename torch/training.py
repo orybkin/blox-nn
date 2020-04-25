@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from torch.nn.parallel._functions import Gather
-from torch.optim import __init__ as optim
+from torch import optim
 from torch.utils.data import DataLoader
 from torch.utils.data import Sampler
 import torch.utils.data as torchd
@@ -118,22 +118,22 @@ def gather(outputs, target_device, dim=0):
 
 
 class MiniTrainer:
-    def __init__(self, model=None, step_fn=None, parameters=None):
+    def __init__(self, model=None, closure=None, parameters=None):
         """
         
         :param model: Either model or parameters have to be specified
-        :param step_fn:
+        :param closure:
         :param parameters: Either model or parameters have to be specified
         """
         if parameters is None:
             parameters = model.parameters()
         
         self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, parameters), lr=0.001)
-        self.step_fn = step_fn
+        self.closure = closure
     
     def step(self, i):
         self.optimizer.zero_grad()
-        loss = self.step_fn(i)
+        loss = self.closure(i)
         loss.backward()
         if i % 1 == 0: print(loss)
         self.optimizer.step()
