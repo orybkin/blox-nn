@@ -302,6 +302,19 @@ class SmartCrossEntropyLoss(CrossEntropyLoss):
             loss = loss.view(tuple(shape_target[:diff_idx]) + loss.shape[1:])
             
         return loss
+    
+    
+class Bernoulli(Categorical):
+    def nll(self, x):
+        if self._log_p is not None:
+            return F.binary_cross_entropy_with_logits(self._log_p, x, reduction='none')
+        
+    @property
+    def p(self):
+        if self._p is not None:
+            return self._p
+        elif self._log_p is not None:
+            return self._log_p.sigmoid()
 
 
 class SequentialGaussian_SharedPQ(Distribution):
