@@ -157,10 +157,19 @@ class ProbabilisticConvDecoder(nn.Module):
         if hp.decoder_distribution == 'gaussian':
             self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
             self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
-        elif hp.decoder_distribution == 'categorical':
+        elif 'categorical' in hp.decoder_distribution:
             # Children not supported
             assert type(decoder_net) == ConvDecoder
-            self.net.gen_head = ConvBlockDec(in_dim=self.net.gen_head.params.in_dim, out_dim=256 * hp.input_nc,
+
+            if self._hp.decoder_distribution == 'categorical':
+                self.n_values_per_pixel = 256
+                self.distribution = ImageCategorical
+            elif self._hp.decoder_distribution == 'bitwise_categorical':
+                self.n_values_per_pixel = 8
+                self.distribution = ImageBitwiseCategorical
+                
+            self.net.gen_head = ConvBlockDec(in_dim=self.net.gen_head.params.in_dim,
+                                             out_dim=self.n_values_per_pixel * hp.input_nc,
                                              normalization=None, activation=None, builder=hp.builder, upsample=False)
 
     def forward(self, *args, **kwargs):
@@ -169,12 +178,13 @@ class ProbabilisticConvDecoder(nn.Module):
         if self._hp.decoder_distribution == 'gaussian':
             # The sigma has to be blown up because of reshaping that happens later
             outputs.distr = Gaussian(outputs.images, self.log_sigma * torch.ones_like(outputs.images))
-        elif self._hp.decoder_distribution == 'categorical':
+        elif 'categorical' in self._hp.decoder_distribution:
             images = outputs.images
-            images = images.reshape(images.shape[0:1] + (256, 3) + images.shape[2:])
+            images = images.reshape(images.shape[0:1] + (self.n_values_per_pixel, -1) + images.shape[2:])
             
-            outputs.distr = ImageCategorical(log_p=images)
-            outputs.images = images.argmax(1).float() / 127.5 - 1
+            outputs.distr = self.distribution(log_p=images)
+            # outputs.images = outputs.distr.mle
+            outputs.images = outputs.distr.mean
         
         return outputs
 
