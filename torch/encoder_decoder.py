@@ -136,7 +136,7 @@ class ImageBitwiseCategorical(Bernoulli):
     def mle(self):
         log_p = self.log_p
         bits_mle = log_p > 0
-        mle = packbits(bits_mle, 1).float()
+        mle = packbits(bits_mle.byte(), 1).float()
         return mle / 127.5 - 1
 
     @property
