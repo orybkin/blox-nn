@@ -22,6 +22,7 @@ def normalize(tensor, dim=1, eps=1e-7):
     norm = torch.clamp(tensor.sum(dim, keepdim=True), eps)
     return tensor / norm
 
+
 def limit_exponent(tensor, min):
     """ Adds a constant to the tensor that brings the exponent of it to the desired min value.
     The constant is treated as a constant for autodiff (is detached)
@@ -29,6 +30,13 @@ def limit_exponent(tensor, min):
     
     diff = (tensor.exp() + min).log() - tensor
     result_tensor = tensor + diff.detach()
+    
+    return result_tensor
+
+
+def softclip(tensor, min):
+    """ Clips the tensor values at the minimum value min in a softway. Taken from Handful of Trials """
+    result_tensor = min + F.softplus(tensor - min)
     
     return result_tensor
 
