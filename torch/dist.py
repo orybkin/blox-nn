@@ -84,9 +84,14 @@ class DiscreteGaussian(Distribution):
         return -self.categorical.log_prob(x)
     
 
-class Beta(Distribution):
+
+class RescaledBeta(Distribution):
     """ A Beta distribution defined on [0,1]"""
     def __init__(self, mu, log_nu):
+        # This distribution parametrizes beta in terms of location and scale
+        # Unfortunately, this means we don't have control over what the values of a,b are,
+        # while it is required that a,b>=1 for Beta to be defined on [0,1].
+        # It is possible that I can figure out a loc-scale parametrization which enforces a,b>=1
         self.dist = distributions.Beta(mu * log_nu.exp(), (1 - mu) * log_nu.exp())
 
     def nll(self, x):
@@ -164,6 +169,10 @@ class Gaussian(LocScaleDistribution):
     def reparametrize(self, eps):
         """Reparametrizes noise sample eps with mean/variance of Gaussian."""
         return self._sigma * eps + self.mu
+
+    @property
+    def mean(self):
+        return self.mu
 
     @property
     def shape(self):
