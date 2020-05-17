@@ -168,7 +168,7 @@ class Gaussian(LocScaleDistribution):
 
     def reparametrize(self, eps):
         """Reparametrizes noise sample eps with mean/variance of Gaussian."""
-        return self._sigma * eps + self.mu
+        return self.sigma * eps + self.mu
 
     @property
     def mean(self):
