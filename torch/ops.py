@@ -228,4 +228,4 @@ def find_extra_dim(smaller, larger):
     diff_idx = (shape_smaller == shape_larger[:-1]).argmin()
     assert (shape_smaller[diff_idx:] == shape_larger[diff_idx + 1:]).all()
     
-    return diff_idx
+    return int(diff_idx)
