@@ -82,8 +82,80 @@ class DiscreteGaussian(Distribution):
     
     def nll(self, x):
         return -self.categorical.log_prob(x)
-    
 
+
+class DiscreteLogistic(Distribution):
+    """ IAFVAE """
+    
+    def __init__(self, mu, log_sigma, range=None):
+        self.mu = mu
+        self.log_sigma = log_sigma
+    
+    def cdf(self, x):
+        return torch.sigmoid(x)
+    
+    def prob(self, x):
+        # Return the probability mass
+        mean = self.mu
+        logscale = self.log_sigma
+        binsize = 1 / 256.0
+        
+        mask_bottom = x == 0
+        mask_top = x == 1
+        
+        scale = torch.exp(logscale)
+        x = (torch.floor(x / binsize) * binsize - mean) / scale
+        
+        p = self.cdf(x + binsize / scale) - self.cdf(x)
+        
+        # Edge cases
+        p_bottom = self.cdf(x + binsize / scale)
+        p[mask_bottom] = p_bottom[mask_bottom]
+        p_top = 1 - self.cdf(x)
+        p[mask_top] = p_top[mask_top]
+        
+        return p
+    
+    def nll(self, x):
+        p = self.prob(x)
+        
+        # Add epsilon for stability
+        return -(p + 1e-7).log()
+    
+    @property
+    def mean(self):
+        return self.mu
+    
+    def to_dict(self):
+        d = {'mu': self.mu, 'log_sigma': self.log_sigma}
+        return d
+
+
+class DiscreteLogisticMixture(DiscreteLogistic):
+    def __init__(self, mu, log_sigma):
+        """
+
+        :param mu:
+        :param log_sigma:
+        :param n: number of elements in the mixture
+        """
+        self.mu = mu
+        self.log_sigma = log_sigma
+    
+    def nll(self, x):
+        mu, log_sigma = self.mu, self.log_sigma
+        dim = find_extra_dim(x, mu)
+        n = mu.shape[dim]
+        
+        x_tiled = x.unsqueeze(dim).repeat_interleave(n, dim)
+        p = DiscreteLogistic(mu, log_sigma).prob(x_tiled).mean(dim)
+        
+        return -(p + 1e-7).log()
+    
+    @property
+    def mean(self):
+        return self.mu.mean(1)
+    
 
 class RescaledBeta(Distribution):
     """ A Beta distribution defined on [0,1]"""
