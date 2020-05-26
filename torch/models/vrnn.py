@@ -89,6 +89,8 @@ class VRNNCell(BaseCell, ProbabilisticModel):
         output.p_z = self.prior(x)  # the input is only used to read the batchsize atm
 
         if z is not None:
+            if self._hp.prior_type == 'learned':
+                z = output.p_z.reparametrize(z)
             pass        # use z directly
         elif self._sample_prior:
             z = output.p_z.sample()
