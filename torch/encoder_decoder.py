@@ -2,14 +2,14 @@ import numpy as np
 from blox import AttrDict, batch_apply2, rmap
 from blox.tensor.ops import broadcast_final, get_dim_inds
 from blox.torch.ops import unpackbits, combine_dim, packbits, find_extra_dim
-from blox.torch.dist import get_constant_parameter, Gaussian, Categorical, Bernoulli
+from blox.torch.dist import get_constant_parameter, Gaussian, Categorical, Bernoulli, DiscreteLogisticMixture
 from blox.torch.layers import ConvBlockEnc, init_weights_xavier, get_num_conv_layers, ConvBlockFirstDec, ConvBlockDec
 from blox.torch.losses import NLL
 from blox.torch.modules import GetIntermediatesSequential, AttrDictPredictor, ConstantUpdater, SkipInputSequential
 from blox.torch.subnetworks import Predictor
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 
 class Encoder(nn.Module):
@@ -147,6 +147,22 @@ class ImageBitwiseCategorical(Bernoulli):
         return (p * value.float()).sum(1) / 127.5 - 1
 
 
+class ImageDLM(DiscreteLogisticMixture):
+    def nll(self, x):
+        return super().nll((x + 1) / 2)
+    
+    @property
+    def mean(self):
+        return super().mean * 2 - 1
+
+
+class HalfSigmoid(nn.Module):
+    def forward(self, x):
+        l = int(x.shape[1] / 2)
+        x1, x2 = x[:, :l], x[:, l:]
+        return torch.cat([F.sigmoid(x1), x2], 1)
+
+
 class ProbabilisticConvDecoder(nn.Module):
     """ This is a wrapper over ConvDecoders that makes the output a distribution """
     def __init__(self, hp, decoder_net):
@@ -157,20 +173,26 @@ class ProbabilisticConvDecoder(nn.Module):
         if hp.decoder_distribution == 'gaussian':
             self.log_sigma = get_constant_parameter(np.log(self._hp.initial_sigma), hp.learn_beta)
             self.sigma_updater = ConstantUpdater(self.log_sigma, 20, 'decoder_sigma')
-        elif 'categorical' in hp.decoder_distribution:
+        elif 'categorical' or 'discrete' in hp.decoder_distribution:
             # Children not supported
             assert type(decoder_net) == ConvDecoder
 
             if self._hp.decoder_distribution == 'categorical':
                 self.n_values_per_pixel = 256
                 self.distribution = ImageCategorical
+                activation = None
             elif self._hp.decoder_distribution == 'bitwise_categorical':
                 self.n_values_per_pixel = 8
                 self.distribution = ImageBitwiseCategorical
+                activation = None
+            elif self._hp.decoder_distribution == 'discrete_logistic_mixture':
+                self.n_values_per_pixel = 10
+                self.distribution = ImageDLM
+                activation = HalfSigmoid()
                 
             self.net.gen_head = ConvBlockDec(in_dim=self.net.gen_head.params.in_dim,
                                              out_dim=self.n_values_per_pixel * hp.input_nc,
-                                             normalization=None, activation=None, builder=hp.builder, upsample=False)
+                                             normalization=None, activation=activation, builder=hp.builder, upsample=False)
 
     def forward(self, *args, **kwargs):
         outputs = self.net(*args, **kwargs)
@@ -184,6 +206,13 @@ class ProbabilisticConvDecoder(nn.Module):
             
             outputs.distr = self.distribution(log_p=images)
             # outputs.images = outputs.distr.mle
+            outputs.images = outputs.distr.mean
+        elif 'discrete_logistic_mixture' == self._hp.decoder_distribution:
+            images = outputs.images
+            images = images.reshape(images.shape[0:1] + (self.n_values_per_pixel, -1) + images.shape[2:])
+            n = int(images.shape[1] / 2)
+
+            outputs.distr = self.distribution(images[:, :n], images[:, n:])
             outputs.images = outputs.distr.mean
         
         return outputs
