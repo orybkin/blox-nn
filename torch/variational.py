@@ -1,6 +1,6 @@
 from blox import AttrDict
 from blox.torch.dist import Gaussian, SequentialGaussian_SharedPQ, ProbabilisticModel
-from blox.torch.losses import KLDivLoss
+from blox.torch.losses import KLDivLoss2
 from blox.torch.subnetworks import Predictor
 from blox.torch.dist import get_constant_parameter
 from blox.torch.ops import batchwise_index, make_one_hot, get_dim_inds
@@ -106,9 +106,8 @@ class AttentiveInference(nn.Module):
         if q_z.mu.numel() == 0:
             return {}
         
-        inds = get_dim_inds(q_z)[1:]
-        return AttrDict(kl=KLDivLoss(self._hp.kl_weight, breakdown=1)(
-            q_z, p_z, weights=weights, log_error_arr=True, reduction=inds))
+        return AttrDict(kl=KLDivLoss2(self._hp.kl_weight, breakdown=1, free_nats_per_dim=self._hp.free_nats)(
+            q_z, p_z, weights=weights, log_error_arr=True))
     
     def get_dummy(self, e_l):
         raise NotImplementedError('do we need to run inference in this case?')
@@ -214,7 +213,6 @@ class CVAE(nn.Module, ProbabilisticModel):
     
     def loss(self, inputs, outputs):
         losses = AttrDict()
-        avg_inds = get_dim_inds(outputs.q_z)[1:]
-        losses.kl = KLDivLoss(self._hp.kl_weight)(outputs.q_z, outputs.p_z, reduction=avg_inds)
+        losses.kl = KLDivLoss2(self._hp.kl_weight)(outputs.q_z, outputs.p_z)
 
         return losses

@@ -5,7 +5,7 @@ from blox import AttrDict, batch_apply, rmap
 from blox.torch.dist import Gaussian, ProbabilisticModel, get_constant_parameter
 from blox.torch.recurrent_modules import BaseCell, InitLSTMCell, CustomLSTMCell
 from blox.torch.variational import setup_variational_inference
-from blox.torch.losses import KLDivLoss
+from blox.torch.losses import KLDivLoss2
 from blox.torch.subnetworks import Predictor
 """ The NoReinitVRNN classes remove the cumbersome separate initialization from the VRNN classes,
  unifying VRNN and ZeroVRNN. Unfortunately, NoReinitVRNN performance is untested and it is not recommended to use
@@ -137,7 +137,7 @@ class NoReinitVRNN(nn.Module):
     def loss(self, inputs, outputs, log_error_arr=False):
         losses = AttrDict()
         
-        losses.kl = KLDivLoss(self._hp.kl_weight) \
-            (outputs.q_z, outputs.p_z, reduction=[-1, -2], log_error_arr=log_error_arr)
+        losses.kl = KLDivLoss2(self._hp.kl_weight) \
+            (outputs.q_z, outputs.p_z, log_error_arr=log_error_arr)
         
         return losses

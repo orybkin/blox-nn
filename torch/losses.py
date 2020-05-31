@@ -72,6 +72,43 @@ class KLDivLoss(Loss):
         return kl_divergence
 
 
+class KLDivLoss2:
+    """ This defines a distributional KL divergence loss that requires less boilerplate """
+    def __init__(self, weight=1.0, breakdown=None, free_nats_per_dim=0):
+        """
+
+        :param weight: the balance term on the loss
+        :param breakdown: if specified, a breakdown of the loss by this dimension will be recorded
+        """
+        self.weight = weight
+        self.breakdown = breakdown
+        self.free_nats_per_dim = free_nats_per_dim
+    
+    def __call__(self, estimates, targets, weights=1, log_error_arr=False):
+        """
+
+        :param estimates:
+        :param targets:
+        :return:
+        """
+        error = estimates.kl_divergence(targets) * weights
+        # Sum across latents and average across the batch
+        reduction = get_dim_inds(estimates)[1:]
+        value = error.sum(reduction).mean()
+        # Apply free nats
+        free_nats = torch.full([], self.free_nats_per_dim * estimates.shape[1]).to(value.device)
+        value = torch.max(value, free_nats)
+        
+        loss = LossDict(value=value, weight=self.weight)
+        
+        if self.breakdown is not None:
+            reduce_dim = get_dim_inds(error)[:self.breakdown] + get_dim_inds(error)[self.breakdown + 1:]
+            loss.breakdown = error.detach().mean(reduce_dim)
+        if log_error_arr:
+            loss.error_mat = error.detach()
+        return loss
+
+
 class CELogitsLoss(Loss):
     compute = staticmethod(torch.nn.functional.cross_entropy)
     
