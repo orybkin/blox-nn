@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import torch
+import torch.utils.checkpoint
 from torch import distributions
 from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
@@ -96,6 +97,11 @@ class DiscreteLogistic(Distribution):
     
     def prob(self, x):
         # Return the probability mass
+        
+        # Use the memory efficient version
+        return torch.utils.checkpoint.checkpoint(self.prob_memory_efficient, x)
+        
+        # Below is an alternative computation provided for clarity
         mean = self.mu
         logscale = self.log_sigma
         binsize = 1 / 256.0
@@ -108,14 +114,50 @@ class DiscreteLogistic(Distribution):
         
         p = self.cdf(x + binsize / scale) - self.cdf(x)
         
+        def masked_assign(dest, source, mask):
+            """ Pytorch masking assign (dest[mask] = source[mask]) takes too much memory """
+            mask = mask.float()
+            return source * mask + dest * (1 - mask)
+
         # Edge cases
         p_bottom = self.cdf(x + binsize / scale)
-        p[mask_bottom] = p_bottom[mask_bottom]
+        p = masked_assign(p, p_bottom, mask_bottom)
+        # p[mask_bottom] = p_bottom[mask_bottom]
         p_top = 1 - self.cdf(x)
-        p[mask_top] = p_top[mask_top]
+        p = masked_assign(p, p_top, mask_top)
+        # p[mask_top] = p_top[mask_top]
         
         return p
     
+    def prob_memory_efficient(self, x):
+        # Return the probability mass
+        mean = self.mu
+        scale = self.log_sigma.exp()
+        binsize = 1. / 256.0
+    
+        x = (torch.floor(x / binsize) * binsize - mean) / scale
+        x_next = x + binsize / scale
+        del scale
+        p = self.cdf(x_next) - self.cdf(x)
+    
+        # Edge cases
+        p_bottom = self.cdf(x_next)
+        del x_next
+        mask_bottom = (x == 0).float()
+        p = p * mask_bottom
+        del mask_bottom
+        p = p + p_bottom * (1 - (x == 0).float())
+        del p_bottom
+    
+        p_top = 1 - self.cdf(x)
+        mask_top = (x == 1).float()
+        del x
+        p = p * mask_top
+        p = p + p_top * (1 - mask_top)
+        del p_top, mask_top
+    
+        return p
+
     def nll(self, x):
         p = self.prob(x)
         
