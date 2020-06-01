@@ -67,10 +67,10 @@ class SingleConv2dLSTMCell(nn.Module):
                                     Variable(self.wc_blank).expand(wc.size(0), wc.size(1) // 3, wc.size(2), wc.size(3)),
                                     wc[:, 2 * self.out_channels:]), 1)
         
-        i = F.sigmoid(wxhc[:, :self.out_channels])
-        f = F.sigmoid(wxhc[:, self.out_channels:2 * self.out_channels])
-        g = F.tanh(wxhc[:, 2 * self.out_channels:3 * self.out_channels])
-        o = F.sigmoid(wxhc[:, 3 * self.out_channels:])
+        i = torch.sigmoid(wxhc[:, :self.out_channels])
+        f = torch.sigmoid(wxhc[:, self.out_channels:2 * self.out_channels])
+        g = torch.tanh(wxhc[:, 2 * self.out_channels:3 * self.out_channels])
+        o = torch.sigmoid(wxhc[:, 3 * self.out_channels:])
         
         c_1 = f * c_0 + i * g
         h_1 = o * F.tanh(c_1)

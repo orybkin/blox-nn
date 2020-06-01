@@ -10,7 +10,7 @@ from blox.torch.modules import ConcatSequential
 
 def init_weights_xavier(m):
     if isinstance(m, nn.Linear):
-        nn.init.xavier_normal(m.weight.data)
+        nn.init.xavier_normal_(m.weight.data)
         if m.bias is not None:
             m.bias.data.fill_(0)
     if isinstance(m, nn.Conv2d):
@@ -140,7 +140,7 @@ class ConvBlockDec(ConvBlock):
     
     def build_block(self):
         if self.params.upsample:
-            self.add_module('upsample', nn.Upsample(scale_factor=2, mode='bilinear'))
+            self.add_module('upsample', nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False))
 
         if self.params.asym_padding:
             self.add_module('pad', nn.ZeroPad2d(padding=self.params.asym_padding))
@@ -163,7 +163,7 @@ class ConvBlockFirstDec(ConvBlockDec):
 
     def build_block(self):
         if self.params.upsample:
-            self.add_module('upsample', nn.Upsample(scale_factor=2, mode='bilinear'))
+            self.add_module('upsample', nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False))
     
         self.add_module('conv', nn.ConvTranspose2d(
             self.params.in_dim, self.params.out_dim, self.params.kernel_size, self.params.stride, self.params.padding,

@@ -160,7 +160,7 @@ class HalfSigmoid(nn.Module):
     def forward(self, x):
         l = int(x.shape[1] / 2)
         x1, x2 = x[:, :l], x[:, l:]
-        return torch.cat([F.sigmoid(x1), x2], 1)
+        return torch.cat([torch.sigmoid(x1), x2], 1)
 
 
 class ProbabilisticConvDecoder(nn.Module):
