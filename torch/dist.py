@@ -99,7 +99,7 @@ class DiscreteLogistic(Distribution):
         # Return the probability mass
         
         # Use the memory efficient version
-        return torch.utils.checkpoint.checkpoint(self.prob_memory_efficient, x)
+        # return torch.utils.checkpoint.checkpoint(self.prob_memory_efficient, x)
         
         # Below is an alternative computation provided for clarity
         mean = self.mu
@@ -131,6 +131,7 @@ class DiscreteLogistic(Distribution):
     
     def prob_memory_efficient(self, x):
         # Return the probability mass
+        # TODO: debug this, it gives good values but training dynamics is different fsr.
         mean = self.mu
         scale = self.log_sigma.exp()
         binsize = 1. / 256.0
@@ -141,6 +142,7 @@ class DiscreteLogistic(Distribution):
         p = self.cdf(x_next) - self.cdf(scaled_x)
     
         # Edge cases
+        # TODO use torch.where (if it is memory efficient
         p_bottom = self.cdf(x_next)
         del x_next
         mask_bottom = (x == 0).float()
