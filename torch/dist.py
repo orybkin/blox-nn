@@ -135,25 +135,25 @@ class DiscreteLogistic(Distribution):
         scale = self.log_sigma.exp()
         binsize = 1. / 256.0
     
-        x = (torch.floor(x / binsize) * binsize - mean) / scale
-        x_next = x + binsize / scale
+        scaled_x = (torch.floor(x / binsize) * binsize - mean) / scale
+        x_next = scaled_x + binsize / scale
         del scale
-        p = self.cdf(x_next) - self.cdf(x)
+        p = self.cdf(x_next) - self.cdf(scaled_x)
     
         # Edge cases
         p_bottom = self.cdf(x_next)
         del x_next
         mask_bottom = (x == 0).float()
-        p = p * mask_bottom
+        p = p * (1 - mask_bottom)
         del mask_bottom
-        p = p + p_bottom * (1 - (x == 0).float())
+        p = p + p_bottom * ((x == 0).float())
         del p_bottom
     
-        p_top = 1 - self.cdf(x)
+        p_top = 1 - self.cdf(scaled_x)
         mask_top = (x == 1).float()
-        del x
-        p = p * mask_top
-        p = p + p_top * (1 - mask_top)
+        del scaled_x
+        p = p * (1 - mask_top)
+        p = p + p_top * mask_top
         del p_top, mask_top
     
         return p
