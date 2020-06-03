@@ -296,7 +296,17 @@ class PixelShiftDecoder(PixelCopyDecoder):
 
 
 class DecoderModule(ProbabilisticConvDecoder):
-    """ The decoder handles variation in the kinds of data that need to be decoded """
+    """ The decoder handles variation in the kinds of data that need to be decoded
+    
+    This module requires a hyperparameter dictionary with the following hyperparameters:
+            'use_skips'
+            'dense_rec_type'
+            'decoder_distribution'
+            'add_weighted_pixel_copy'
+            'pixel_shift_decoder'
+            'initial_sigma'
+            'learn_beta'
+    """
     
     def __init__(self, hp, regress_actions):
         self._hp = hp
@@ -330,10 +340,12 @@ class DecoderModule(ProbabilisticConvDecoder):
 
     def forward(self, input, **kwargs):
         if not (self._hp.pixel_shift_decoder or self._hp.add_weighted_pixel_copy):
-            kwargs.pop('pixel_source')
+            if 'pixel_source' in kwargs:
+                kwargs.pop('pixel_source')
         
         if not self._hp.use_skips:
-            kwargs.pop('skips')
+            if 'skips' in kwargs:
+                kwargs.pop('skips')
         
         output = super().forward(input, **kwargs)
         
