@@ -108,3 +108,10 @@ def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1, value=0):
         size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
         size = list(zip(size[::2], size[1::2]))
         return np.pad(generalized_tensor, size, mode='constant', constant_values=value)
+    
+    
+def pad_sequences(list, dim=1, value=0):
+    """ Pads a list of tensors to have equal length at the dimension `dim` """
+    length = np.max([seq.shape[dim] for seq in list])
+    list = [pad_to(seq, length, dim, value=value) for seq in list]
+    return list
