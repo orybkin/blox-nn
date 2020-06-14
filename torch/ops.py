@@ -164,35 +164,6 @@ def reduce_dim(tensor, dim):
     shape = list(tensor.shape)
     return tensor.view(shape[:dim-1] + [-1] + shape[dim+1:])
     
-
-def pad_to(tensor, size, dim=-1, mode='back'):
-    # TODO: padding to the back somehow pads to the beginning
-    kwargs = dict()
-    
-    padding = size - tensor.shape[dim]
-    if mode == 'front':
-        kwargs['pad_front'] = padding
-    else:
-        kwargs['pad_back'] = padding
-        
-    return pad(tensor, **kwargs, dim=dim)
-
-
-def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1):
-    """ Pads a tensor at the specified dimension"""
-    l = len(generalized_tensor.shape)
-    if dim < 0:
-        dim = l + dim
-  
-    if isinstance(generalized_tensor, torch.Tensor):
-        # pad takes dimensions in reversed order for some reason
-        size = (l - dim - 1) * 2 * [0] + [pad_front, pad_back] + (dim) * 2 * [0]
-        return F.pad(generalized_tensor, size)
-    elif isinstance(generalized_tensor, np.ndarray):
-        size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
-        size = list(zip(size[::2], size[1::2]))
-        return np.pad(generalized_tensor, size, mode='constant')
-    
     
 def unpackbits(ten, dim=-1):
     """ Applies np.unpackbits """
