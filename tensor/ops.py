@@ -88,8 +88,11 @@ def pad_to(tensor, size, dim=-1, mode='back', value=0):
     padding = size - tensor.shape[dim]
     if mode == 'front':
         kwargs['pad_front'] = padding
-    else:
+    elif mode == 'back':
         kwargs['pad_back'] = padding
+    elif mode == 'equal':
+        kwargs['pad_front'] = int(padding / 2 + 0.5)
+        kwargs['pad_back'] = int(padding / 2)
     
     return pad(tensor, **kwargs, dim=dim, value=value)
 
