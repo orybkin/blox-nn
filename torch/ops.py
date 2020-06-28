@@ -6,6 +6,7 @@ from blox.tensor import ndim
 from blox.tensor.ops import *
 from blox.torch.core import *
 
+
 def apply_linear(layer, val, dim):
     """Applies a liner layer to the specified dimension."""
     assert isinstance(layer, nn.Linear)     # can only apply linear layers

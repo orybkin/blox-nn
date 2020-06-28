@@ -128,20 +128,3 @@ class PenaltyLoss(Loss):
     def compute(self, val):
         """Computes weighted mean of val as penalty loss."""
         return val
-
-
-if __name__ == "__main__":
-    from recursive_planning.rec_planner_utils.logger import Logger
-    logger = Logger(log_dir="./summaries")
-    dummy_estimates = torch.rand([32, 10, 3, 64, 64])
-    dummy_targets = torch.rand([32, 10, 3, 64, 64])
-    dummy_weights = torch.rand([32, 10, 3, 64, 64])
-
-    loss = l2_loss(dummy_estimates, dummy_targets, dummy_weights, logger, 10)
-
-    dummy_estimates = torch.rand([32, 10, 64])
-    dummy_targets = torch.rand([32, 10, 64])
-    dummy_weights = torch.rand([32, 10, 32])
-
-    loss = kl_div_loss(dummy_estimates, dummy_targets, dummy_weights, logger, 10)
-    print("Done!")

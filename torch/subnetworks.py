@@ -1,19 +1,16 @@
 import math
 from functools import partial
-from itertools import chain
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from blox import AttrDict, batch_apply
-from blox.tensor.ops import broadcast_final, batchwise_index, batchwise_assign, remove_spatial, concat_inputs
+
+from blox.tensor.ops import broadcast_final, batchwise_assign, remove_spatial
 from blox.torch.layers import BaseProcessingNet, ConvBlock
-from blox.torch.losses import CELogitsLoss
 from blox.torch.ops import apply_linear
 from blox.torch.ops import like, mask_out
 from blox.torch.recurrent_modules import BaseProcessingLSTM, BidirectionalLSTM, BareLSTMCell
-from torch.distributions.one_hot_categorical import OneHotCategorical
 
 
 class Predictor(BaseProcessingNet):
@@ -30,69 +27,6 @@ class Predictor(BaseProcessingNet):
     def forward(self, *inp):
         out = super().forward(*inp)
         return remove_spatial(out, yes=not self.spatial)
-
-
-class Attention(nn.Module):
-    def __init__(self, hp):
-        super().__init__()
-        self._hp = hp
-        time_cond_length = self._hp.max_seq_len if self._hp.one_hot_attn_time_cond else 1
-        input_size = hp.nz_enc * 2 + time_cond_length if hp.timestep_cond_attention else hp.nz_enc * 2
-        self.query_net = Predictor(hp, input_size, hp.nz_attn_key)
-        self.attention_layers = nn.ModuleList([MultiheadAttention(hp) for _ in range(hp.n_attention_layers)])
-        self.predictor_layers = nn.ModuleList([Predictor(hp, hp.nz_enc, hp.nz_attn_key, num_layers=2)
-                                               for _ in range(hp.n_attention_layers)])
-        self.out = nn.Linear(hp.nz_enc, hp.nz_enc)
-
-    def forward(self, values, keys, query_input, start_ind, end_ind, inputs, timestep=None, attention_weights=None):
-        """
-        Performs multi-layered, multi-headed attention.
-
-        Note: the query can have a different batch size from the values/keys. In that case, the query is interpreted as
-        multiple queries, i.e. the values are tiled to match the query tensor size.
-        
-        :param values: tensor batch x length x dim_v
-        :param keys: tensor batch x length x dim_k
-        :param query_input: input to the query network, batch2 x dim_k
-        :param start_ind:
-        :param end_ind:
-        :param inputs:
-        :param timestep: specify the timestep of the attention directly. tensor batch2 x 1
-        :param attention_weights:
-        :return:
-        """
-        
-        if timestep is not None:
-            mult = int(timestep.shape[0] / keys.shape[0])
-            if mult > 1:
-                timestep = timestep.reshape(-1, mult)
-                result = batchwise_index(values, timestep.long())
-                return result.reshape([-1] + list(result.shape[2:])), None
-                
-            return batchwise_index(values, timestep[:, 0].long()), None
-
-        query = self.query_net(*query_input)
-        s_ind, e_ind = (torch.floor(start_ind), torch.ceil(end_ind)) if self._hp.mask_inf_attention \
-                                                                     else (inputs.start_ind, inputs.end_ind)
-        
-        # Reshape values, keys, inputs if not enough dimensions
-        mult = int(query.shape[0] / keys.shape[0])
-        tile = lambda x: x[:, None][:, [0] * mult].reshape((-1,) + x.shape[1:])
-        values = tile(values)
-        keys = tile(keys)
-        s_ind = tile(s_ind)
-        e_ind = tile(e_ind)
-        
-        # Attend
-        norm_shape_k = query.shape[1:]
-        norm_shape_v = values.shape[2:]
-        raw_attn_output, att_weights = None, None
-        for attention, predictor in zip(self.attention_layers, self.predictor_layers):
-            raw_attn_output, att_weights = attention(query, keys, values, s_ind, e_ind, attention_weights=attention_weights)
-            x = F.layer_norm(raw_attn_output, norm_shape_v)
-            query = F.layer_norm(predictor(x) + query, norm_shape_k)  # skip connections around attention and predictor
-
-        return apply_linear(self.out, raw_attn_output, dim=1), att_weights     # output non-normalized output of final attention layer
 
 
 class MultiheadAttention(nn.Module):
@@ -223,53 +157,6 @@ class BidirectionalSeqEncodingModule(SeqEncodingModule):
         self.net = BidirectionalLSTM(hp, input_size, hp.nz_enc)
 
 
-class AttnKeyEncodingModule(SeqEncodingModule):
-    def build_network(self, input_size, hp):
-        self.net = Predictor(hp, input_size, hp.nz_attn_key, num_layers=1)
-
-    def forward(self, seq):
-        return batch_apply(seq.contiguous(), self.net)
-
-
-class RecurrentPolicyModule(SeqEncodingModule):
-    def __init__(self, hp, input_size, output_size, add_time=True):
-        super().__init__(hp, False)
-        self.hp = hp
-        self.output_size = output_size
-        self.net = BaseProcessingLSTM(hp, input_size, output_size)
-
-    def build_network(self, input_size, hp):
-        pass
-
-    def forward(self, seq):
-        sh = list(seq.shape)
-        seq = seq.view(sh[:2] + [-1])
-        proc_seq = self.run_net(seq)
-        proc_seq = proc_seq.view(sh[:2] + [self.output_size] + sh[3:])
-        return proc_seq
-
-
-class LengthPredictorModule(nn.Module):
-    """Predicts the length of a segment given start and goal image encoding of that segment."""
-    def __init__(self, hp):
-        super().__init__()
-        self._hp = hp
-        self.p = Predictor(hp, hp.nz_enc * 2, hp.max_seq_len)
-
-    def forward(self, e0, eg):
-        """Returns the logits of a OneHotCategorical distribution."""
-        output = AttrDict()
-        output.seq_len_logits = remove_spatial(self.p(e0, eg))
-        output.seq_len_pred = OneHotCategorical(logits=output.seq_len_logits)
-        
-        return output
-    
-    def loss(self, inputs, model_output):
-        losses = AttrDict()
-        losses.len_pred = CELogitsLoss(self._hp.length_pred_weight)(model_output.seq_len_logits, inputs.end_ind)
-        return losses
-
-
 class HiddenStatePredictorModel(BareLSTMCell):
     """ A predictor module that has a hidden state. The hidden state is exposed in the forward function """
     def __init__(self, hp, input_dim, output_dim):
@@ -282,47 +169,6 @@ class HiddenStatePredictorModel(BareLSTMCell):
     def forward(self, hidden_state, *inputs):
         output = super().forward(*inputs, hidden_state=hidden_state)
         return output.hidden_state, output.output
-
-
-class SumTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
-    """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
-
-    def forward(self, hidden1, hidden2, *inputs):
-        hidden_state = hidden1 + hidden2
-        return super().forward(hidden_state, *inputs)
-
-
-class LinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
-    """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
-    def build_network(self):
-        super().build_network()
-        self.projection = nn.Linear(self.get_state_dim() * 2, self.get_state_dim())
-
-    def forward(self, hidden1, hidden2, *inputs):
-        hidden_state = self.projection(concat_inputs(hidden1, hidden2))
-        return super().forward(hidden_state, *inputs)
-
-
-class SplitLinTreeHiddenStatePredictorModel(HiddenStatePredictorModel):
-    """ A HiddenStatePredictor for tree morphologies. Averages parents' hidden states """
-    def build_network(self):
-        super().build_network()
-        split_state_size = int(self.get_state_dim() / (self._hp.n_lstm_layers * 2))
-        
-        if self._hp.use_conv_lstm:
-            projection = lambda: nn.Conv2d(split_state_size * 2, split_state_size, kernel_size=3, padding=1)
-        else:
-            projection = lambda: nn.Linear(split_state_size * 2, split_state_size)
-        
-        self.projections = torch.nn.ModuleList([projection() for _ in range(self._hp.n_lstm_layers*2)])
-
-    def forward(self, hidden1, hidden2, *inputs):
-        chunked_hidden1 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden1, self._hp.n_lstm_layers, 1)]))
-        chunked_hidden2 = list(chain(*[torch.chunk(h, 2, 1) for h in torch.chunk(hidden2, self._hp.n_lstm_layers, 1)]))
-        chunked_projected = [projection(concat_inputs(h1, h2))
-                             for projection, h1, h2 in zip(self.projections, chunked_hidden1, chunked_hidden2)]
-        hidden_state = torch.cat(chunked_projected, dim=1)
-        return super().forward(hidden_state, *inputs)
 
 
 class GeneralizedPredictorModel(nn.Module):
@@ -353,16 +199,3 @@ class GeneralizedPredictorModel(nn.Module):
             outputs.append(output)
         outputs = outputs[0] if len(outputs) == 1 else outputs
         return outputs
-
-
-class ActionConditioningWrapper(nn.Module):
-    def __init__(self, hp, net):
-        super().__init__()
-        self.net = net
-        self.ac_net = Predictor(hp, hp.nz_enc + hp.n_actions, hp.nz_enc)
-
-    def forward(self, input, actions):
-        net_outputs = self.net(input)
-        padded_actions = torch.nn.functional.pad(actions, (0, 0, 0, net_outputs.shape[1] - actions.shape[1], 0, 0))
-        net_outputs = batch_apply(torch.cat([net_outputs, broadcast_final(padded_actions, input)], dim=2), self.ac_net)
-        return net_outputs
