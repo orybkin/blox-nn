@@ -159,13 +159,13 @@ class VRNN(nn.Module):
         outputs = rmap(lambda ten: ten[:, conditioning_length - 1:], outputs)
         return outputs
     
-    def loss(self, inputs, model_output, log_error_arr=False):
+    def loss(self, inputs, outputs, log_error_arr=False):
         losses = AttrDict()
         
         # TODO this is wrong
         # Is it???
         losses.kl = KLDivLoss2(self._hp.kl_weight) \
-            (model_output.q_z, model_output.p_z, log_error_arr=log_error_arr)
+            (outputs.q_z, outputs.p_z, log_error_arr=log_error_arr)
         
         return losses
 
