@@ -40,7 +40,8 @@ class RepeatedDataLoader(DataLoader):
     def __init__(self, *args, n_repeat=1, **kwargs):
         super().__init__(*args, **kwargs)
         if n_repeat != 1:
-            self.batch_sampler = RepeatedSampler(self.batch_sampler, n_repeat)
+            # This is needed to bypass a pytorch check
+            object.__setattr__(self, 'batch_sampler', RepeatedSampler(self.batch_sampler, n_repeat))
             
             
 class RepeatedSampler(Sampler):
