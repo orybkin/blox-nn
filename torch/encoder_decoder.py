@@ -1,5 +1,5 @@
 import numpy as np
-from blox import AttrDict, batch_apply2, rmap
+from blox import AttrDict, batch_apply, rmap
 from blox.tensor.ops import broadcast_final, get_dim_inds
 from blox.torch.ops import unpackbits, combine_dim, packbits, find_extra_dim
 from blox.torch.dist import get_constant_parameter, Gaussian, Categorical, Bernoulli, DiscreteLogisticMixture
@@ -369,16 +369,16 @@ class DecoderModule(ProbabilisticConvDecoder):
         seq_skips = rmap(extend_to_seq, inputs.skips)
         pixel_source = rmap(extend_to_seq, [inputs.I_0, inputs.I_g])
         
-        return batch_apply2(self, input=encodings, skips=seq_skips, pixel_source=pixel_source)
+        return batch_apply(self, input=encodings, skips=seq_skips, pixel_source=pixel_source)
     
     def loss(self, inputs, outputs, extra_action=True, first_image=True, log_error_arr=False):
-        loss_gt = inputs.demo_seq
+        loss_gt = inputs.traj_seq
         loss_pad_mask = inputs.pad_mask
         if not first_image:
             loss_gt = loss_gt[:, 1:]
             loss_pad_mask = loss_pad_mask[:, 1:]
         
-        weights = broadcast_final(loss_pad_mask, inputs.demo_seq)
+        weights = broadcast_final(loss_pad_mask, inputs.traj_seq)
         # Skip first frame
         losses = self.nll(outputs.distr, loss_gt[:, 1:], weights[:, 1:], log_error_arr)
         

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from blox import AttrDict, batch_apply, rmap
+from blox import AttrDict, rmap
 from blox.torch.dist import Gaussian, ProbabilisticModel, get_constant_parameter
 from blox.torch.recurrent_modules import BaseCell, InitLSTMCell, CustomLSTMCell
 from blox.torch.variational import setup_variational_inference

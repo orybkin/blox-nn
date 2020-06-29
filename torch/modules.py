@@ -90,7 +90,7 @@ class Batched(nn.Module):
         self.net = net
         
     def forward(self, *args):
-        return batch_apply(args, self.net, separate_arguments=True)
+        return batch_apply(self.net, *args, self.net)
 
 
 class Updater(nn.Module):

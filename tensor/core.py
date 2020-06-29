@@ -3,8 +3,9 @@ import torch
 from functools import partial
 
 
-def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
-    """ Applies the fn to the tensors while treating two first dimensions of tensors as batch.
+def batch_apply_legacy(tensors, fn, separate_arguments=False, unshape_inputs=False):
+    """ Legacy interface, use batch_apply.
+    Applies the fn to the tensors while treating two first dimensions of tensors as batch.
 
     :param tensors: can be a single tensor, tuple or a list.
     :param fn: _fn_ can return a single tensor, tuple or a list
@@ -33,15 +34,19 @@ def batch_apply(tensors, fn, separate_arguments=False, unshape_inputs=False):
     return output_reshaped_back
 
 
-def batch_apply2(fn, *args, unshape_inputs=False, **kwargs):
-    """ Provides an interface that is unified with map-like functions"""
-    # TODO this should be the base implementation. Remove the cases and only use the unified implementation
-    # TODO this should be the default interface (i.e. batch_apply instead of batch_apply2)
+def batch_apply(fn, *args, unshape_inputs=False, **kwargs):
+    """ Applies the fn to the tensors while treating the two first dimensions of tensors as batch dimensions.
+
+    :param fn: a function
+    :param *args: a number of tensors or tensor structures. These are fed into the `fn`
+    :param unshape_inputs: if true, reshapes the inputs back to original (in case they have references to classes)
+    :param **kwargs: a number of named parameters. These are fed into the `fn` """
     
     if len(args) == 0:
-        return batch_apply(kwargs, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
+        # TODO remove the cases and only use the unified implementation
+        return batch_apply_legacy(kwargs, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
     elif len(kwargs) == 0:
-        return batch_apply(args, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
+        return batch_apply_legacy(args, fn, separate_arguments=True, unshape_inputs=unshape_inputs)
     else:
         # TODO test
         reference_tensor = find_tensor([args, kwargs], min_dim=2)
@@ -65,9 +70,8 @@ def batch_apply2(fn, *args, unshape_inputs=False, **kwargs):
 
 def batched(fn):
     def wrapper(*args, **kwargs):
-        # TODO support both args and kwargs
         inputs = args if len(args) > 0 else kwargs
-        return batch_apply(inputs, fn, separate_arguments=True)
+        return batch_apply(fn, inputs)
         
     return wrapper
 

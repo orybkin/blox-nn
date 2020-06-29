@@ -27,7 +27,7 @@ class LSTMPredictor(nn.Module):
         h0 = inp.new_zeros(n, inp.shape[0], self._hp.nz_mid_lstm)
         
         out = self.net(inp, (c0, h0))[0]
-        projected = batch_apply(out.contiguous(), self.out_projection)
+        projected = batch_apply(self.out_projection, out.contiguous())
         return projected
 
 
