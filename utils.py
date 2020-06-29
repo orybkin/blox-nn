@@ -3,8 +3,7 @@ import heapq
 import time
 from contextlib import contextmanager
 
-from blox.tensor.core import map_recursive, map_recursive_list
-from blox import AttrDict
+from blox import AttrDict, rmap, rmap_list
 
 
 class AverageMeter(object):
@@ -58,9 +57,9 @@ class RecursiveAverageMeter(object):
         if self.sum is None:
             self.sum = val
         else:
-            self.sum = map_recursive_list(lambda x, y: x + y, [self.sum, val])
+            self.sum = rmap_list(lambda x, y: x + y, [self.sum, val])
         self.count += 1
-        self.avg = map_recursive(lambda x: x / self.count, self.sum)
+        self.avg = rmap(lambda x: x / self.count, self.sum)
 
 
 @contextmanager

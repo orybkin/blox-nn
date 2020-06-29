@@ -175,15 +175,13 @@ def make_recursive_list(fn):
     return recursive_map
 
 
-def map_recursive(fn, tensors, **kwargs):
+# TODO make this the main implementation
+def rmap(fn, tensors, **kwargs):
     return make_recursive(fn, **kwargs)(tensors)
 
 
-def map_recursive_list(fn, tensors):
+def rmap_list(fn, tensors):
     return make_recursive_list(fn)(tensors)
 
 
-# TODO make rmap the main implementation
-rmap = map_recursive
-rmap_list = map_recursive_list
 recursively = make_recursive
