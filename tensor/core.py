@@ -1,6 +1,14 @@
 from blox.basic_types import map_dict, listdict2dictlist
-import torch
 from functools import partial
+
+# This is used to check if something is isintance(x, Tensor)
+TENSOR = ()
+
+try:
+    import torch
+    TENSOR.append(torch.Tensor)
+except:
+    pass
 
 
 def batch_apply_legacy(tensors, fn, separate_arguments=False, unshape_inputs=False):
@@ -14,7 +22,7 @@ def batch_apply_legacy(tensors, fn, separate_arguments=False, unshape_inputs=Fal
     :param unshape_inputs: if true, reshapes the inputs back to original (in case they have references to classes)"""
     
     reference_tensor = find_tensor(tensors, min_dim=2)
-    if not isinstance(reference_tensor, torch.Tensor):
+    if not isinstance(reference_tensor, TENSOR):
         raise ValueError("couldn't find a reference tensor")
     
     batch, time = reference_tensor.shape[:2]
@@ -50,7 +58,7 @@ def batch_apply(fn, *args, unshape_inputs=False, **kwargs):
     else:
         # TODO test
         reference_tensor = find_tensor([args, kwargs], min_dim=2)
-        if not isinstance(reference_tensor, torch.Tensor):
+        if not isinstance(reference_tensor, TENSOR):
             raise ValueError("couldn't find a reference tensor")
     
         batch, time = reference_tensor.shape[:2]
@@ -103,7 +111,7 @@ def find(inp, success_fn):
 def find_tensor(structure, min_dim=None):
     """ Finds a single tensor in the structure """
     def success_fn(x):
-        success = isinstance(x, torch.Tensor)
+        success = isinstance(x, TENSOR)
         if min_dim is not None:
             success = success and len(x.shape) >= min_dim
             
@@ -115,7 +123,7 @@ def find_tensor(structure, min_dim=None):
 find_element = lambda structure: find(structure, success_fn=lambda x: True)
 
 
-def make_recursive(fn, *argv, target_class=torch.Tensor, strict=False, only_target=False, **kwargs):
+def make_recursive(fn, *argv, target_class=TENSOR, strict=False, only_target=False, **kwargs):
     """ Takes a fn and returns a function that can apply fn on tensor structure
      which can be a single tensor, tuple or a list.
      
@@ -162,7 +170,7 @@ def make_recursive_list(fn):
             return type(tensors[0])(map(recursive_map, zip(*tensors)))
         elif isinstance(tensors[0], dict):
             return map_dict(recursive_map, listdict2dictlist(tensors))
-        elif isinstance(tensors[0], torch.Tensor):
+        elif isinstance(tensors[0], TENSOR):
             return fn(*tensors)
         elif hasattr(tensors[0], 'to_dict'):
             old_type = type(tensors[0])
