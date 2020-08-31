@@ -1,10 +1,7 @@
 # Blox
-_Blox_ is a high-level library of building blox for deep neural networks in pytorch.
+_Blox_ is a set of high-level tools and building blox for deep neural networks in pytorch.
 
-# Examples
-Coming soon
-
-# Documentation
+# Examples and Documentation
 Oh well. Maybe email one of us?
 
 # Contributors and Acknowledgements
