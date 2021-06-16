@@ -4,11 +4,14 @@ Author: Oleg Rybkin (olehrybkin.com, oleh.rybkin@gmail.com)
 """
 
 import numpy as np
-import torch
+try:
+    import torch
+    from blox.torch.core import ten2ar, ar2ten
+except:
+    pass
 import sys
 import numbers
 
-from blox.torch.core import ten2ar, ar2ten
 from blox.tensor.core import find_element
 from blox import rmap
 

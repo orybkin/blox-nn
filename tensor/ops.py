@@ -1,9 +1,20 @@
+import sys
 import numpy as np
-import torch
-import torch.nn.functional as F
+try:
+    import torch
+    import torch.nn.functional as F
+    from blox.tensor import ndim
+except:
+    pass
 from blox.core import optional
-from blox.tensor import ndim
 from blox.tensor.core import *
+
+
+def get_framework(generalized_tensor):
+    if isinstance(generalized_tensor, np.ndarray):
+        return 'np'
+    elif 'torch' in sys.modules and isinstance(generalized_tensor, torch.Tensor):
+        return 'torch'
 
 
 def add_n_dims(generalized_tensor, n, dim=-1):
@@ -103,11 +114,11 @@ def pad(generalized_tensor, pad_front=0, pad_back=0, dim=-1, value=0):
     if dim < 0:
         dim = l + dim
     
-    if isinstance(generalized_tensor, torch.Tensor):
+    if get_framework(generalized_tensor) == 'torch':
         # pad takes dimensions in reversed order for some reason
         size = (l - dim - 1) * 2 * [0] + [pad_front, pad_back] + (dim) * 2 * [0]
         return F.pad(generalized_tensor, size, value=value)
-    elif isinstance(generalized_tensor, np.ndarray):
+    elif get_framework(generalized_tensor) == 'np':
         size = (dim) * 2 * [0] + [pad_front, pad_back] + (l - dim - 1) * 2 * [0]
         size = list(zip(size[::2], size[1::2]))
         return np.pad(generalized_tensor, size, mode='constant', constant_values=value)
