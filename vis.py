@@ -1,9 +1,12 @@
 import numpy as np
 from PIL import Image
-from torchvision.transforms import Resize
 import os
-import moviepy.editor as mpy
-from moviepy.audio.AudioClip import AudioArrayClip
+from torchvision.transforms import Resize
+try:
+    import moviepy.editor as mpy
+    from moviepy.audio.AudioClip import AudioArrayClip
+except:
+    pass
 import tempfile
 from subprocess import call
 from scipy.io import wavfile
@@ -142,6 +145,11 @@ def resize_video_chfirst(video, size):
 
 
 def resize_video(video, size):
+    if size is None or size[0] is None:
+        return video
+    if video[0].shape[0] == size[0] and  video[0].shape[1] == size[1]:
+        return np.stack(video, axis=0)
+    
     # return video
     # video = ch_first2last(video).astype(np.uint8)
     # lazy transform ;)
